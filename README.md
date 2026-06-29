@@ -1,131 +1,71 @@
-## qFlipper
+# 🐬 Hyper-Zero-UI (HZUI)
 
-### Graphical desktop application for updating [Flipper Zero](https://flipperzero.one/) firmware via PC
-qFlipper is completely open source and based on [Qt](https://www.qt.io/) framework. Runs on Windows, macOS, Linux.
+> **Unofficial fork** of [qFlipper](https://github.com/flipperdevices/qFlipper), the Flipper Zero desktop app. Not affiliated with or endorsed by Flipper Devices.
 
-<img alt="qFlipper" width="450" src="https://cdn.flipperzero.one/qflipper_logo_with_connected_flipper.png" />
+A heavily-customized qFlipper UI starring **LOTEI** — a snarky, **100% local** AI dolphin that lives inside the app — plus a full pink makeover, a runtime color editor, neural voice, and a live Flipper-screen mirror.
 
-## Download
+**No API keys. No cloud. No cost.** LOTEI runs entirely on your machine via [Ollama](https://ollama.com).
 
-Download official qFlipper builds here: [update.flipperzero.one](https://update.flipperzero.one/)
+<!-- Screenshots: on GitHub, click the pencil (Edit) on this README and drag your
+     images / video right here — GitHub uploads + hosts them and inserts the markdown
+     for you, no need to commit the files. -->
 
-<a href="https://update.flipperzero.one"><img width="300" alt="download qFlipper Button" src="https://cdn.flipperzero.one/download_qFlipper_button.png" /></a>
+## ✨ Features
 
+- **🐬 LOTEI** — a local-AI chat assistant (Ollama + `qwen2.5:7b`) built right into the app: a flirty, vain, RAM-glutton pink dolphin with **agentic tools**. He can browse and read your Flipper's SD card, save scripts onto it, and press the device's buttons to navigate menus — all over qFlipper's existing RPC link.
+- **🎙️ Neural voice** — local [Piper](https://github.com/rhasspy/piper) text-to-speech with a click-to-cycle voice switcher and mood-based tempo. Falls back to Windows SAPI if Piper isn't installed.
+- **🎨 Live color editor** — recolor the *entire* UI at runtime, every color individually, with live preview. Persists across launches. (Click **COLORS**, top-left.)
+- **👁️ Flipper-screen mirror** — watch the device's 128×64 screen live in the chat panel as LOTEI works.
+- **🎵 Music player** — drop `.mp3`s into a `Music/` folder next to the exe; shuffle-plays in the footer.
+- **💖 Full pink theme** throughout.
 
-## Features
-* Update Flipper's firmware and supplemental data with a press of one button
-* Repair a broken firmware installation
-* Stream Flipper's display and control it remotely
-* Install firmware from a `.dfu` file
-* Backup and restore settings, progress and pairing data
-* Automatic self-update feature
-* Command line interface
+## 🧰 Requirements
 
-## Build from sources 
-### Cloning
-Make sure to clone the project together with submodules: 
-```sh
-git clone https://github.com/flipperdevices/qFlipper.git --recursive
-```
-### Windows
+- **Windows 10/11** (64-bit)
+- **[Qt 6.4.2](https://www.qt.io/)** (`msvc2019_64`) — easiest via [`aqt`](https://github.com/miurahr/aqtinstall). Modules: `qtdeclarative qttools qtserialport qt5compat qtmultimedia qtspeech qtimageformats svg`. Put Qt on a **different drive** than this source (a qmake quirk — otherwise the build fails in `dfu`).
+- **MSVC 2019** build tools + [`jom`](https://wiki.qt.io/Jom)
+- **[Ollama](https://ollama.com)** + the `qwen2.5:7b` model (~4.7 GB). A GPU with ≥6 GB VRAM is recommended (runs on CPU too, just slower).
 
-Build requirements:
-- MS Visual Studio 2019 or newer
-- Qt5 (MSVC build) >= 5.15.0 or Qt6 >= 6.3.0
-- NSIS (to generate the installer)
+## 🔨 Build
 
-Edit `build_windows.bat` to adjust to your build environment and then run:
-```cmd
-build_windows.bat
+```bat
+git clone <your-fork-url> --recursive qFlipper-src
+cd qFlipper-src
+:: optionally override the defaults: set QT_DIR=...  set VS_VCVARS=...  set JOM=...
+build_pink.bat
 ```
 
-Note: STM32 Bootloader driver is not provided in this repository.
+Output: `build\qFlipper.exe`. For the first run, copy Qt's DLLs/plugins next to it with `windeployqt`:
 
-### Linux
-#### Docker build (AppImage, official)
-
-Setup dev container by running:
-```sh 
-docker compose up -d
-```
-Compile qFlipper by running:
-```sh
-docker compose exec dev ./build_linux.sh
+```bat
+"%QT_DIR%\bin\windeployqt.exe" --qmldir application build\qFlipper.exe
 ```
 
-#### Standalone build
-Build requirements:
-- Qt5 >= 5.15.0 or Qt6 >= 6.3.0
-- libusb >= 1.0.16
-- zlib >= 1.2.0
+After that, `build_pink_inc.bat` is the fast incremental build for code/QML changes.
 
-Make sure to install the following Qt modules (the exact package names might differ slightly depending on your Linux distribution): 
-```
-base, tools, serialport, declarative,  wayland, [quickcontrols2, graphicaleffects] (Qt5 only), qt5-compat (Qt6 only)
-```
-Then run:
-```sh
-mkdir build && cd build
-qmake ../qFlipper.pro PREFIX=/path/to/install/dir -spec linux-g++ CONFIG+=qtquickcompiler && 
-make qmake_all && make && make install
-```
-**Caution:** `make install`ing to the system prefix is not recommended. Instead, use this method for building distro-specific packages. 
-In this case, it is possible to disable the built-in application update feature by passing `DEFINES+=DISABLE_APPLICATION_UPDATES` to the `qmake` call.
+## 🐬 Set up LOTEI (the AI + voice)
 
-### MacOS
+1. **Ollama** — install it, then: `ollama pull qwen2.5:7b`
+2. **Piper voice** — run the setup script, pointing it at the folder that holds `qFlipper.exe`:
+   ```powershell
+   ./setup-lotei.ps1 -AppDir .\build
+   ```
+   This downloads Piper + a few neural voices into `<AppDir>\piper\`.
+3. **(Optional) Music** — drop `.mp3` files into `<AppDir>\Music\`.
+4. Make sure `ollama serve` is running, then launch `qFlipper.exe`. LOTEI wakes up and says hi. 🐬
 
-Build requirements:
+> LOTEI auto-discovers any extra Piper `.onnx` voices you drop into `piper\voices\` — grab more from the [Piper voices catalog](https://huggingface.co/rhasspy/piper-voices). Click his voice name to cycle them.
 
-- Xcode or command line tools
-- Qt6 6.3.1 static universal from [Flipper brew tap](https://github.com/flipperdevices/homebrew-flipper)
-- libusb 1.0.24 universal from [Flipper brew tap](https://github.com/flipperdevices/homebrew-flipper)
-- [dmgbuild](https://pypi.org/project/dmgbuild/) >= 1.5.2
+## 🧩 What was added on top of qFlipper
 
-If you want to sign binaries, set `SIGNING_KEY` environment variable:
+All the LOTEI work lives in `application/`: `loteibackend.{h,cpp}` (the AI backend, agentic tools, Piper TTS, and the `LoteiPalette` color engine), `components/LoteiChat.qml` (the chat panel + screen mirror), `components/MusicPlayer.qml`, and the color editor in `components/MainWindow.qml`. The base project structure is unchanged from [upstream qFlipper](https://github.com/flipperdevices/qFlipper#project-structure).
 
-	export SIGNING_KEY="Your Developer Key ID"
+## 🙏 Credits
 
-Building, signing and creating package:
+- **[qFlipper](https://github.com/flipperdevices/qFlipper)** — Flipper Devices (the base app this forks)
+- **[Piper](https://github.com/rhasspy/piper)** — Michael Hansen / rhasspy (neural TTS)
+- **[Ollama](https://ollama.com)** + **[Qwen2.5](https://github.com/QwenLM/Qwen2.5)** — the local LLM stack
 
-	./build_mac.sh
+## 📜 License
 
-Resulting image can be found in: `build_mac/qFlipper.dmg`
-
-## Run
-
-### Linux
-```sh
-./build/qFlipper-x86_64.AppImage
-```
-
-or just launch the file above from your favourite file manager.
-You will likely need to set up udev rules in order to use qFlipper as a normal user:
-```sh
-./qFlipper-x86_64.AppImage rules install [/optional/path/to/rules/dir]
-```
-
-#### Package managers support
-See [contrib](./contrib) for available options.
-
-## Project structure
-- `application` - The main graphical application, written mostly in QML.
-- `cli` - The command line interface, provides nearly all main application's functionality.
-- `backend` - The backend library, written in C++. Takes care of most of the logic.
-- `dfu` - Low level library for accessing USB and DFU devices.
-- `plugins` - Protobuf-based communication protocol support.
-- `3rdparty` - Third-party libraries.
-- `contrib` - Contributed packages and scripts.
-- `driver-tool` - DFU driver installation tool for Windows (based on `libwdi`).
-- `docker` - Docker configuration files.
-- `installer-assets` - Supplementary data for deployment.
-
-## Reporting bugs
-qFlipper is a project under active development. Please report any encountered bugs to make it better!
-
-The (mostly) complete guide is located [here](./.github/ISSUE_TEMPLATE/bug_report.md).
-
-## Known bugs
-
-* Sometimes Flipper's serial port doesn't get recognised by the OS, which leads to firmware update errors. This is a firmware issue.
-* On some systems, there is noticeable flicker during opening, closing or resizing of the log area.
-* Release source archives are automatically generated by Github and are unsuitable for building as they do not contain submodules.
+**GPLv3**, inherited from qFlipper — see [LICENSE](LICENSE). This is an independent, unofficial fork. "Flipper Zero" and "qFlipper" are trademarks of Flipper Devices Inc.; this project is not affiliated with them.

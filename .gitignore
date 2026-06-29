@@ -6,3 +6,9 @@ x64
 Win32
 .vs
 .DS_Store
+
+# LOTEI runtime deps (fetched by setup-lotei.ps1, never committed)
+/piper/
+/Music/
+*.orig
+*.log

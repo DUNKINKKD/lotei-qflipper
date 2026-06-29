@@ -95,6 +95,11 @@ AbstractOverlay {
         ]
     }
 
+    LoteiChat {
+        z: 50
+        visible: tabs.currentIndex === 0
+    }
+
     TabBar {
         id: tabs
         x: 28

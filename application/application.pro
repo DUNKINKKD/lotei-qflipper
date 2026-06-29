@@ -1,4 +1,4 @@
-QT += quick serialport widgets quickcontrols2 svg
+QT += quick serialport widgets quickcontrols2 svg network texttospeech multimedia
 
 include(../qflipper_common.pri)
 
@@ -11,6 +11,7 @@ SOURCES += \
         application.cpp \
         applicationupdater.cpp \
         applicationupdateregistry.cpp \
+        loteibackend.cpp \
         main.cpp \
         qtsingleapplication/qtlocalpeer.cpp \
         qtsingleapplication/qtlockedfile.cpp \
@@ -91,6 +92,7 @@ HEADERS += \
     application.h \
     applicationupdater.h \
     applicationupdateregistry.h \
+    loteibackend.h \
     qtsingleapplication/qtlocalpeer.h \
     qtsingleapplication/qtlockedfile.h \
     qtsingleapplication/qtsingleapplication.h \

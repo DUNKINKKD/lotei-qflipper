@@ -9,6 +9,7 @@
 #include "applicationbackend.h"
 #include "systemfiledialog.h"
 #include "applicationupdateregistry.h"
+#include "loteibackend.h"
 
 class Application : public QtSingleApplication
 {
@@ -72,9 +73,10 @@ private:
     ApplicationUpdateRegistry m_updateRegistry;
     SystemFileDialog m_fileDialog;
     ApplicationBackend m_backend;
+    LoteiBackend m_lotei;
+    LoteiPalette m_palette;
     QQmlApplicationEngine m_engine;
 
     bool m_isDeveloperMode;
     UpdateStatus m_updateStatus;
 };
-

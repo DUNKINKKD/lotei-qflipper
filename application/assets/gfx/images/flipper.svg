@@ -14,7 +14,7 @@
    xmlns:svg="http://www.w3.org/2000/svg"><defs
    id="defs24" />&#10;<style
    type="text/css"
-   id="style1">&#10;	.st0{fill:url(#SVGID_1_);}&#10;	.st1{fill:#FE8A2C;}&#10;</style>&#10;<g
+   id="style1">&#10;	.st0{fill:url(#SVGID_1_);}&#10;	.st1{fill:#fd8cff;}&#10;</style>&#10;<g
    id="g24"
    transform="translate(-2)">&#10;	<linearGradient
    id="SVGID_1_"
@@ -24,13 +24,13 @@
    x2="181.8875"
    y2="-1.2854">&#10;		<stop
    offset="7.885129e-07"
-   style="stop-color:#3C1A00"
+   style="stop-color:#341d34"
    id="stop1" />&#10;		<stop
    offset="0.5511"
-   style="stop-color:#220F00"
+   style="stop-color:#1e101e"
    id="stop2" />&#10;		<stop
    offset="1"
-   style="stop-color:#090400"
+   style="stop-color:#080408"
    id="stop3" />&#10;	</linearGradient>&#10;	<path
    class="st0"
    d="m 303.3,1.2 c 0,0 -219.9,0 -229.7,0 -9.8,0 -17,10.3 -17,10.3 0,0 -49.3,63.9 -51.4,66.8 -3,4 -2.1,14.1 0,17 5.9,8 34.5,47.1 35.8,48.8 1.4,1.7 7.7,11.1 16.5,11.1 8.8,0 278.7,0 283.5,0 8.7,0 19.6,-20.2 19.6,-25.2 0,-5 -0.3,-58.9 -0.3,-64.5 0,-3.7 -2.6,-8.4 -5.1,-11.5 C 352.9,51.2 319.9,10 317,6.5 314.5,3.6 308.8,1.2 303.3,1.2 Z"

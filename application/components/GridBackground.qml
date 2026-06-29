@@ -12,8 +12,8 @@ Rectangle {
     border.color: Theme.color.lightorange2
 
     gradient: Gradient {
-        GradientStop { position: 0; color: "#090400" }
-        GradientStop { position: 1; color: "#210F00" }
+        GradientStop { position: 0; color: "#080408" }
+        GradientStop { position: 1; color: "#1d101d" }
     }
 
     Item {
@@ -59,7 +59,7 @@ Rectangle {
             const cellSize = width / numCells;
 
             const ctx = getContext("2d");
-            ctx.strokeStyle = "#aa5115";
+            ctx.strokeStyle = "#9d579f";
             ctx.lineWidth = 2;
 
             for(let ypos = cellSize; ypos < height; ypos += cellSize) {

@@ -11,6 +11,7 @@
 #include <QFontDatabase>
 #include <QLoggingCategory>
 #include <QCommandLineParser>
+#include <QProcess>
 #include <QtQuickControls2/QQuickStyle>
 
 #include "updateregistry.h"
@@ -122,6 +123,16 @@ void Application::initConnections()
     connect(this, &QtSingleApplication::messageReceived, this, &Application::onMessageReceived);
     connect(&m_updateRegistry, &Flipper::UpdateRegistry::latestVersionChanged, this, &Application::onLatestVersionChanged);
     connect(&m_backend, &ApplicationBackend::currentDeviceChanged, this, &Application::onCurrentDeviceChanged);
+
+    m_lotei.setAppBackend(&m_backend);
+
+    // Shut LOTEI's brain (Ollama) down when qFlipper really quits, so it never
+    // lingers, piles up duplicate servers, or hogs RAM. Only the primary
+    // instance reaches here (a second launch exits early via isRunning()).
+    connect(this, &QCoreApplication::aboutToQuit, this, []() {
+        QProcess::startDetached(QStringLiteral("taskkill"),
+                                {QStringLiteral("/IM"), QStringLiteral("ollama.exe"), QStringLiteral("/F")});
+    });
 }
 
 void Application::initCommandOptions()
@@ -197,6 +208,8 @@ void Application::initQmlTypes()
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "Logger", globalLogger);
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "Preferences", globalPrefs);
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "Backend", &m_backend);
+    qmlRegisterSingletonInstance("QFlipper", 1, 0, "Lotei", &m_lotei);
+    qmlRegisterSingletonInstance("QFlipper", 1, 0, "Palette", &m_palette);
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "App", this);
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "SystemFileDialog", &m_fileDialog);
 }

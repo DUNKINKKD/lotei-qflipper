@@ -1,40 +1,43 @@
 pragma Singleton
 
 import QtQuick 2.15
+import QFlipper 1.0
 
 QtObject {
+    // Every color flows from the runtime-editable Palette singleton, so the
+    // color editor recolors the whole UI live. (transparent stays literal.)
     readonly property var color: QtObject {
         readonly property color transparent: Qt.rgba(0, 0, 0, 0)
 
-        readonly property color lightorange1: "#ff9722"
-        readonly property color lightorange2: "#fe8a2c"
-        readonly property color lightorange3: "#ce5300"
-        readonly property color darkorange1: "#491d00"
-        readonly property color darkorange2: "#3a1f10"
-        readonly property color mediumorange1: "#9e5823"
-        readonly property color mediumorange2: "#76380b"
-        readonly property color mediumorange3: "#662c00"
-        readonly property color mediumorange4: "#9b450b"
-        readonly property color mediumorange5: "#9e4a12"
+        readonly property color lightorange1: Palette.colors.lightorange1
+        readonly property color lightorange2: Palette.colors.lightorange2
+        readonly property color lightorange3: Palette.colors.lightorange3
+        readonly property color darkorange1: Palette.colors.darkorange1
+        readonly property color darkorange2: Palette.colors.darkorange2
+        readonly property color mediumorange1: Palette.colors.mediumorange1
+        readonly property color mediumorange2: Palette.colors.mediumorange2
+        readonly property color mediumorange3: Palette.colors.mediumorange3
+        readonly property color mediumorange4: Palette.colors.mediumorange4
+        readonly property color mediumorange5: Palette.colors.mediumorange5
 
-        readonly property color lightgreen: "#2ed832"
-        readonly property color mediumgreen1: "#285b12"
-        readonly property color mediumgreen2: "#203812"
-        readonly property color darkgreen: "#0c160c"
+        readonly property color lightgreen: Palette.colors.lightgreen
+        readonly property color mediumgreen1: Palette.colors.mediumgreen1
+        readonly property color mediumgreen2: Palette.colors.mediumgreen2
+        readonly property color darkgreen: Palette.colors.darkgreen
 
-        readonly property color lightblue: "#228cff"
-        readonly property color mediumblue: "#143c66"
-        readonly property color darkblue1: "#11355c"
-        readonly property color darkblue2: "#152b47"
+        readonly property color lightblue: Palette.colors.lightblue
+        readonly property color mediumblue: Palette.colors.mediumblue
+        readonly property color darkblue1: Palette.colors.darkblue1
+        readonly property color darkblue2: Palette.colors.darkblue2
 
-        readonly property color lightred1: "#ff5b27"
-        readonly property color lightred2: "#ff5924"
-        readonly property color lightred3: "#ff1f00"
-        readonly property color lightred4: "#ff3c00"
-        readonly property color mediumred1: "#953618"
-        readonly property color mediumred2: "#672715"
-        readonly property color darkred1: "#451a0e"
-        readonly property color darkred2: "#331400"
+        readonly property color lightred1: Palette.colors.lightred1
+        readonly property color lightred2: Palette.colors.lightred2
+        readonly property color lightred3: Palette.colors.lightred3
+        readonly property color lightred4: Palette.colors.lightred4
+        readonly property color mediumred1: Palette.colors.mediumred1
+        readonly property color mediumred2: Palette.colors.mediumred2
+        readonly property color darkred1: Palette.colors.darkred1
+        readonly property color darkred2: Palette.colors.darkred2
     }
 
     readonly property var timing: QtObject {
