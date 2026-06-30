@@ -196,6 +196,31 @@ Item {
             }
         }
 
+        TextLabel {
+            id: portToggle
+            anchors.top: parent.top
+            anchors.left: colorsButton.right
+            anchors.leftMargin: 20
+            anchors.topMargin: 10
+
+            visible: Backend.portReleased || (Backend.deviceState && Backend.backendState === ApplicationBackend.Ready)
+            color: Backend.portReleased ? Theme.color.lightgreen : Theme.color.lightorange2
+            opacity: portMouse.containsMouse ? 1.0 : (Backend.portReleased ? 1.0 : 0.5)
+
+            font.family: "ProggySquareTT"
+            font.pixelSize: 16
+            text: Backend.portReleased ? "RECONNECT" : "RELEASE PORT"
+
+            MouseArea {
+                id: portMouse
+                anchors.fill: parent
+                anchors.margins: -6
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: Backend.portReleased ? Backend.reacquirePort() : Backend.releasePort()
+            }
+        }
+
         DeviceWidget {
             id: deviceWidget
             opacity: Backend.backendState !== ApplicationBackend.ScreenStreaming &&

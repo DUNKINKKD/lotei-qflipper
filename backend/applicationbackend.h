@@ -38,6 +38,7 @@ class ApplicationBackend : public QObject
     Q_PROPERTY(Flipper::Updates::VersionInfo latestFirmwareVersion READ latestFirmwareVersion NOTIFY firmwareUpdateStateChanged)
     Q_PROPERTY(BackendError::ErrorType errorType READ errorType NOTIFY errorTypeChanged)
     Q_PROPERTY(bool isQueryInProgress READ isQueryInProgress NOTIFY isQueryInProgressChanged)
+    Q_PROPERTY(bool portReleased READ portReleased NOTIFY portReleasedChanged)
 
 public:
     enum class BackendState {
@@ -91,6 +92,8 @@ public:
     // TODO: Replace it with a state
     bool isQueryInProgress() const;
 
+    bool portReleased() const;   // user has handed the serial port off to another app
+
     /* Actions available from the GUI.
      * Applies to the currently active device. */
 
@@ -111,12 +114,18 @@ public:
     Q_INVOKABLE void checkFirmwareUpdates();
     Q_INVOKABLE void finalizeOperation();
 
+    // Clean serial-port handoff: release the COM port so another app/CLI tool can
+    // use it, then grab it back. No app restart needed.
+    Q_INVOKABLE void releasePort();
+    Q_INVOKABLE void reacquirePort();
+
 signals:
     void errorTypeChanged();
     void currentDeviceChanged();
     void backendStateChanged();
     void firmwareUpdateStateChanged();
     void isQueryInProgressChanged();
+    void portReleasedChanged();
 
 private slots:
     void onCurrentDeviceChanged();
@@ -149,4 +158,5 @@ private:
 
     BackendState m_backendState;
     BackendError::ErrorType m_errorType;
+    bool m_portReleased = false;
 };

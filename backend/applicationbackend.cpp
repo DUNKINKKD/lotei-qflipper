@@ -17,6 +17,7 @@
 
 #include "flipperzero/flipperzero.h"
 #include "flipperzero/devicestate.h"
+#include "flipperzero/protobufsession.h"
 #include "flipperzero/assetmanifest.h"
 #include "flipperzero/screenstreamer.h"
 
@@ -231,6 +232,42 @@ void ApplicationBackend::finalizeOperation()
         }
 
         setBackendState(BackendState::Ready);
+    }
+}
+
+bool ApplicationBackend::portReleased() const
+{
+    return m_portReleased;
+}
+
+void ApplicationBackend::releasePort()
+{
+    // Clean handoff: tear down the RPC session, which closes the underlying
+    // serial/COM port so another app can grab it. The screen streamer stops
+    // ITSELF when the session drops (ScreenStreamer::onProtobufSessionStateChanged),
+    // so we must NOT stop it here too -- doing so raced the session teardown.
+    auto *dev = m_deviceRegistry->currentDevice();
+    if(dev && dev->rpc()) {
+        dev->rpc()->stopSession();
+    }
+    if(!m_portReleased) {
+        m_portReleased = true;
+        emit portReleasedChanged();
+    }
+}
+
+void ApplicationBackend::reacquirePort()
+{
+    if(m_portReleased) {
+        m_portReleased = false;
+        emit portReleasedChanged();
+    }
+    auto *dev = m_deviceRegistry->currentDevice();
+    if(dev && dev->rpc()) {
+        dev->rpc()->startSession();   // reopens the port; queued cmds resume
+        if(deviceState() && !deviceState()->isRecoveryMode()) {
+            m_screenStreamer->start();
+        }
     }
 }
 
