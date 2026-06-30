@@ -1,7 +1,11 @@
-https://github.com/user-attachments/assets/2421251a-8c28-43c7-b14d-e39354daed1e
-<img width="686" height="411" alt="IMG_9806" src="https://github.com/user-attachments/assets/2be70ecd-2db6-4e8d-9673-ff7ca632fb24" />
-<img width="682" height="408" alt="IMG_9804" src="https://github.com/user-attachments/assets/bc002a81-cac6-4db1-b232-e40b1a7588f1" />
-<img width="683" height="397" alt="IMG_9805" src="https://github.com/user-attachments/assets/57ff69c7-4936-456d-891a-0331826365ce" />
+
+
+https://github.com/user-attachments/assets/026177db-b18d-437a-8670-7ccf5799bc9e
+
+<img width="686" height="411" alt="IMG_9806" src="https://github.com/user-attachments/assets/0e165538-80c4-457a-b36a-4331c0b58be4" />
+<img width="682" height="408" alt="IMG_9804" src="https://github.com/user-attachments/assets/3ae68568-b233-458a-a736-937bb4b0b3d7" />
+<img width="683" height="397" alt="IMG_9805" src="https://github.com/user-attachments/assets/c2223c8c-0d02-4a31-b9bb-34edef6ee2fe" />
+
 # 🐬 Hyper-Zero-UI (HZUI)
 
 > **Unofficial fork** of [qFlipper](https://github.com/flipperdevices/qFlipper), the Flipper Zero desktop app. Not affiliated with or endorsed by Flipper Devices.
