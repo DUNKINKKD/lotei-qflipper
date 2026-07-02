@@ -8,6 +8,13 @@ https://github.com/user-attachments/assets/026177db-b18d-437a-8670-7ccf5799bc9e
 
 # 🐬 Hyper-Zero-UI (HZUI)
 
+[![Latest release](https://img.shields.io/github/v/release/DUNKINKKD/lotei-qflipper?color=ff4fa3&label=release)](https://github.com/DUNKINKKD/lotei-qflipper/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/DUNKINKKD/lotei-qflipper/total?color=ff4fa3)](https://github.com/DUNKINKKD/lotei-qflipper/releases)
+[![License](https://img.shields.io/badge/license-GPLv3-ff4fa3.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/DUNKINKKD/lotei-qflipper?color=ff4fa3)](https://github.com/DUNKINKKD/lotei-qflipper/stargazers)
+[![100% local](https://img.shields.io/badge/AI-100%25%20local-ff4fa3)](#)
+[![Powered by Ollama](https://img.shields.io/badge/powered%20by-Ollama-ff4fa3)](https://ollama.com)
+
 > **Unofficial fork** of [qFlipper](https://github.com/flipperdevices/qFlipper), the Flipper Zero desktop app. Not affiliated with or endorsed by Flipper Devices.
 
 A heavily-customized qFlipper UI starring **LOTEI** — a snarky, **100% local** AI dolphin that lives inside the app — plus a full pink makeover, a runtime color editor, neural voice, and a live Flipper-screen mirror.
