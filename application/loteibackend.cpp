@@ -266,6 +266,9 @@ LoteiBackend::LoteiBackend(QObject *parent)
     m_muted = QSettings().value(QStringLiteral("lotei/muted"), false).toBool();
     m_voiceVolume = QSettings().value(QStringLiteral("lotei/voiceVolume"), 1.0).toDouble();
     m_musicVolume = QSettings().value(QStringLiteral("lotei/musicVolume"), 0.55).toDouble();
+    m_model = QSettings().value(QStringLiteral("lotei/model"), QString::fromUtf8(LOTEI_MODEL)).toString();
+    m_setupComplete = QSettings().value(QStringLiteral("lotei/setupComplete"), false).toBool();
+    m_manualName = QSettings().value(QStringLiteral("lotei/manualName")).toString();
     m_tts.setVolume(m_voiceVolume);
 
     // Piper playback chain + voice discovery (falls back to SAPI if absent).
@@ -282,6 +285,7 @@ LoteiBackend::LoteiBackend(QObject *parent)
     m_voiceTmpDir = QDir::tempPath() + QStringLiteral("/lotei-voice");
     QDir().mkpath(m_voiceTmpDir);
     discoverPiper();
+    refreshModels();   // discover installed Ollama models (async; harmless if Ollama's down)
     // Restore the saved voice once the TTS engine has enumerated its voices.
     QTimer::singleShot(1200, this, [this]() {
         const QString saved = QSettings().value(QStringLiteral("lotei/voice")).toString();
@@ -513,6 +517,119 @@ void LoteiBackend::cycleVoice()
     }
 }
 
+QString LoteiBackend::modelName() const
+{
+    return m_model;
+}
+
+QStringList LoteiBackend::availableModels() const
+{
+    return m_models;
+}
+
+void LoteiBackend::setModel(const QString &model)
+{
+    if (model.isEmpty() || model == m_model) { return; }
+    m_model = model;
+    QSettings().setValue(QStringLiteral("lotei/model"), m_model);
+    emit modelChanged();
+}
+
+void LoteiBackend::cycleModel()
+{
+    if (m_models.isEmpty()) { refreshModels(); return; }   // none discovered yet; (re)fetch
+    const int idx = m_models.indexOf(m_model);
+    setModel(m_models.at((idx + 1) % m_models.size()));    // idx == -1 -> first
+}
+
+void LoteiBackend::refreshModels()
+{
+    QNetworkRequest req{QUrl(QStringLiteral("http://localhost:11434/api/tags"))};
+    QNetworkReply *reply = m_net.get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        const bool online = (reply->error() == QNetworkReply::NoError);
+        if (online != m_ollamaOnline) { m_ollamaOnline = online; emit modelChanged(); }
+        if (!online) { return; }   // Ollama down/unreachable
+        const QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
+        QStringList found;
+        const QJsonArray arr = obj.value(QStringLiteral("models")).toArray();
+        for (const QJsonValue &v : arr) {
+            const QString name = v.toObject().value(QStringLiteral("name")).toString();
+            if (!name.isEmpty()) { found << name; }
+        }
+        found.sort(Qt::CaseInsensitive);
+        if (found != m_models) {
+            m_models = found;
+            emit modelChanged();   // let the switcher pick up the discovered list
+        }
+    });
+}
+
+bool LoteiBackend::setupComplete() const { return m_setupComplete; }
+bool LoteiBackend::ollamaOnline() const  { return m_ollamaOnline; }
+QString LoteiBackend::manualName() const { return m_manualName; }
+
+void LoteiBackend::setManualName(const QString &name)
+{
+    if (name == m_manualName) { return; }
+    m_manualName = name;
+    QSettings().setValue(QStringLiteral("lotei/manualName"), m_manualName);
+    emit manualNameChanged();
+}
+
+void LoteiBackend::completeSetup()
+{
+    if (m_setupComplete) { return; }
+    m_setupComplete = true;
+    QSettings().setValue(QStringLiteral("lotei/setupComplete"), true);
+    emit setupCompleteChanged();
+}
+
+void LoteiBackend::resetSetup()
+{
+    m_setupComplete = false;
+    QSettings().setValue(QStringLiteral("lotei/setupComplete"), false);
+    emit setupCompleteChanged();
+}
+
+void LoteiBackend::recheckOllama()
+{
+    refreshModels();
+}
+
+QStringList LoteiBackend::personalityPresets() const
+{
+    return { QStringLiteral("Snarky pink dolphin"),
+             QStringLiteral("Chill helper"),
+             QStringLiteral("Chaos gremlin"),
+             QStringLiteral("Deadpan pro"),
+             QStringLiteral("Sweet companion") };
+}
+
+void LoteiBackend::applyPreset(const QString &name)
+{
+    QString persona;
+    if (name == QStringLiteral("Chill helper")) {
+        persona = QStringLiteral("You are calm, warm and concise -- a laid-back, friendly helper. Light on snark, easy-going, genuinely helpful.");
+    } else if (name == QStringLiteral("Chaos gremlin")) {
+        persona = QStringLiteral("You are a chaotic, hyper, mischievous gremlin -- playful, unpredictable, high-energy and harmlessly unhinged. Chaos with a heart.");
+    } else if (name == QStringLiteral("Deadpan pro")) {
+        persona = QStringLiteral("You are dry, deadpan and professional -- efficient, subtle wit, minimal fluff. You just get things done.");
+    } else if (name == QStringLiteral("Sweet companion")) {
+        persona = QStringLiteral("You are a sweet, supportive companion -- encouraging, gentle, a genuine hype-buddy always in the user's corner.");
+    }
+    // "Snarky pink dolphin" clears the override -> the built-in default stands.
+    QSettings().setValue(QStringLiteral("lotei/personality"), persona);
+}
+
+void LoteiBackend::applyNamePersonality()
+{
+    QSettings().setValue(QStringLiteral("lotei/personality"),
+        QStringLiteral("Build and fully embody a personality inspired by your own name -- lean into "
+                       "whatever character, vibe or theme the name evokes, and stay consistent in it."));
+}
+
 void LoteiBackend::setThinking(bool value)
 {
     if (value != m_thinking) {
@@ -585,17 +702,29 @@ void LoteiBackend::saveHistory()
 QString LoteiBackend::systemPrompt() const
 {
     QString sys = QString::fromUtf8(LOTEI_SYSTEM);
-    // The assistant adopts the connected Flipper's device name as its own.
+
+    // Optional personality chosen in the setup wizard (fresh users). If unset,
+    // the built-in personality above stands -- a hand-edited LOTEI_SYSTEM is
+    // never overridden unless someone deliberately picks a preset.
+    const QString persona = QSettings().value(QStringLiteral("lotei/personality")).toString();
+    if (!persona.isEmpty()) {
+        sys += QStringLiteral("\n\nPERSONALITY -- adopt THIS character (every operational rule above "
+                              "still fully applies): ") + persona;
+    }
+
+    // The assistant adopts the Flipper's name: the connected device's name if
+    // present, else the name given during setup.
+    QString name;
     static const QRegularExpression nameRe(QStringLiteral("(?m)^Name:\\s*(.+)$"));
     const QRegularExpressionMatch nm = nameRe.match(m_deviceContext);
-    if (nm.hasMatch()) {
-        const QString dn = nm.captured(1).trimmed();
-        if (!dn.isEmpty()) {
-            sys += QStringLiteral("\n\nYOUR NAME -- IMPORTANT: you are bonded to a Flipper Zero named "
-                "\"%1\". \"%1\" is YOUR name now: introduce yourself as %1 and refer to yourself as %1, "
-                "NOT LOTEI (LOTEI is just your underlying model line). Your personality is unchanged.").arg(dn);
-        }
+    if (nm.hasMatch()) { name = nm.captured(1).trimmed(); }
+    if (name.isEmpty()) { name = m_manualName; }
+    if (!name.isEmpty()) {
+        sys += QStringLiteral("\n\nYOUR NAME -- IMPORTANT: you are bonded to a Flipper Zero named "
+            "\"%1\". \"%1\" is YOUR name now: introduce yourself as %1 and refer to yourself as %1, "
+            "NOT LOTEI (LOTEI is just your underlying model line).").arg(name);
     }
+
     if (!m_deviceContext.isEmpty()) {
         sys += QStringLiteral("\n\nLive Flipper device diagnostics:\n") + m_deviceContext;
     }
@@ -623,7 +752,7 @@ void LoteiBackend::dispatchToOllama()
     }
 
     QJsonObject body;
-    body["model"] = QString::fromUtf8(LOTEI_MODEL);
+    body["model"] = m_model;
     body["messages"] = messages;
     body["tools"] = loteiTools();
     body["stream"] = true;
@@ -968,4 +1097,278 @@ void LoteiPalette::save() const
     }
     QSettings().setValue(QStringLiteral("lotei/palette"),
                          QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact)));
+}
+
+// ============================ FirmwareStore ============================
+
+// Short display label for a channel id.
+static QString fwChannelLabel(const QString &id)
+{
+    if (id == QLatin1String("development"))       { return QStringLiteral("dev"); }
+    if (id == QLatin1String("release-candidate"))  { return QStringLiteral("rc"); }
+    return id;   // "release", "dev"
+}
+
+FirmwareStore::FirmwareStore(QObject *parent)
+    : QObject(parent)
+{
+    m_net.setRedirectPolicy(QNetworkRequest::NoLessSafeRedirectPolicy);
+
+    const QString rel = QStringLiteral("release");
+    const QStringList git = { QStringLiteral("release"), QStringLiteral("dev") };
+
+    // fields: name, kind, locator, blurb, channels, wantChannel, latest, tgzUrl, status, raw
+    m_sources = {
+        { QStringLiteral("Official"),    Kind::DirJson,
+          QStringLiteral("https://update.flipperzero.one/firmware/directory.json"),
+          QStringLiteral("Stock Flipper Devices firmware."),      {},  rel, {}, {}, {}, {} },
+        { QStringLiteral("Momentum"),    Kind::DirJson,
+          QStringLiteral("https://up.momentum-fw.dev/firmware/directory.json"),
+          QStringLiteral("Feature-rich community firmware."),     {},  rel, {}, {}, {}, {} },
+        { QStringLiteral("Unleashed"),   Kind::GitHub,
+          QStringLiteral("DarkFlippers/unleashed-firmware"),
+          QStringLiteral("Popular unlocked community firmware."), git, rel, {}, {}, {}, {} },
+        { QStringLiteral("RogueMaster"), Kind::GitHub,
+          QStringLiteral("RogueMaster/flipperzero-firmware-wPlugins"),
+          QStringLiteral("Everything, plus the kitchen sink."),   git, rel, {}, {}, {}, {} },
+    };
+
+    // Restore each firmware's remembered channel choice.
+    QSettings st;
+    for (Source &s : m_sources) {
+        const QString saved = st.value(QStringLiteral("firmware/ch/") + s.name).toString();
+        if (!saved.isEmpty()) { s.wantChannel = saved; }
+    }
+}
+
+void FirmwareStore::setOpen(bool value)
+{
+    if (value == m_open) { return; }
+    m_open = value;
+    emit openChanged();
+    if (m_open) { refresh(); }   // freshen versions each time the panel opens
+}
+
+void FirmwareStore::setBusy(bool value)
+{
+    if (value == m_busy) { return; }
+    m_busy = value;
+    emit busyChanged();
+}
+
+QVariantList FirmwareStore::sources() const
+{
+    QVariantList out;
+    for (const Source &s : m_sources) {
+        QVariantMap m;
+        m.insert(QStringLiteral("name"), s.name);
+        m.insert(QStringLiteral("blurb"), s.blurb);
+        m.insert(QStringLiteral("latest"), s.latest);
+        m.insert(QStringLiteral("status"), s.status);
+        m.insert(QStringLiteral("ready"), s.status == QLatin1String("ready") && !s.tgzUrl.isEmpty());
+        m.insert(QStringLiteral("channel"), fwChannelLabel(currentChannelId(s)));
+        m.insert(QStringLiteral("channelCount"), s.channels.size());
+        out.append(m);
+    }
+    return out;
+}
+
+void FirmwareStore::refresh()
+{
+    for (int i = 0; i < m_sources.size(); ++i) {
+        m_sources[i].status = QStringLiteral("checking");
+        m_sources[i].latest.clear();
+        m_sources[i].tgzUrl.clear();
+    }
+    emit changed();
+    for (int i = 0; i < m_sources.size(); ++i) { fetchOne(i); }
+}
+
+QString FirmwareStore::currentChannelId(const Source &s) const
+{
+    if (s.channels.contains(s.wantChannel)) { return s.wantChannel; }
+    return s.channels.isEmpty() ? s.wantChannel : s.channels.first();
+}
+
+void FirmwareStore::fetchOne(int index)
+{
+    if (index < 0 || index >= m_sources.size()) { return; }
+    const Source src = m_sources.at(index);
+
+    // GitHub: pull the whole release list (newest-first) so release/dev come from one fetch.
+    QUrl url = (src.kind == Kind::DirJson)
+             ? QUrl(src.locator)
+             : QUrl(QStringLiteral("https://api.github.com/repos/%1/releases?per_page=30").arg(src.locator));
+
+    QNetworkRequest req(url);
+    req.setRawHeader("User-Agent", "Hyper-Zero-UI");
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+
+    QNetworkReply *reply = m_net.get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, index]() {
+        reply->deleteLater();
+        if (index < 0 || index >= m_sources.size()) { return; }
+        Source &s = m_sources[index];
+
+        if (reply->error() != QNetworkReply::NoError) {
+            s.status = QStringLiteral("error");
+            emit changed();
+            return;
+        }
+        s.raw = reply->readAll();
+
+        // Discover the channel list from the directory.json, but keep only the
+        // canonical channels -- Momentum also lists dozens of per-PR preview
+        // channels (long ids like "pr294:feat/...") that we don't want to cycle.
+        if (s.kind == Kind::DirJson) {
+            const QJsonArray channels = QJsonDocument::fromJson(s.raw).object()
+                                        .value(QStringLiteral("channels")).toArray();
+            auto hasChannel = [&channels](const QString &id) {
+                for (const QJsonValue &cv : channels) {
+                    if (cv.toObject().value(QStringLiteral("id")).toString() == id) { return true; }
+                }
+                return false;
+            };
+            static const QStringList canonical = {
+                QStringLiteral("release"), QStringLiteral("release-candidate"), QStringLiteral("development") };
+            QStringList ids;
+            for (const QString &c : canonical) { if (hasChannel(c)) { ids << c; } }
+            s.channels = ids;
+        }
+
+        deriveFromCache(index);
+        emit changed();
+    });
+}
+
+void FirmwareStore::deriveFromCache(int index)
+{
+    if (index < 0 || index >= m_sources.size()) { return; }
+    Source &s = m_sources[index];
+    const QString ch = currentChannelId(s);
+    s.latest.clear();
+    s.tgzUrl.clear();
+    if (s.raw.isEmpty()) { s.status = QStringLiteral("error"); return; }
+
+    if (s.kind == Kind::DirJson) {
+        const QJsonArray channels = QJsonDocument::fromJson(s.raw).object()
+                                    .value(QStringLiteral("channels")).toArray();
+        for (const QJsonValue &cv : channels) {
+            const QJsonObject c = cv.toObject();
+            if (c.value(QStringLiteral("id")).toString() != ch) { continue; }
+            const QJsonArray versions = c.value(QStringLiteral("versions")).toArray();
+            if (versions.isEmpty()) { break; }
+            const QJsonObject v0 = versions.first().toObject();
+            s.latest = v0.value(QStringLiteral("version")).toString();
+            for (const QJsonValue &fv : v0.value(QStringLiteral("files")).toArray()) {
+                const QJsonObject f = fv.toObject();
+                if (f.value(QStringLiteral("target")).toString() == QLatin1String("f7") &&
+                    f.value(QStringLiteral("type")).toString() == QLatin1String("update_tgz")) {
+                    s.tgzUrl = f.value(QStringLiteral("url")).toString();
+                    break;
+                }
+            }
+            break;
+        }
+    } else {   // GitHub: "dev" = newest release, "release" = newest non-prerelease
+        const QJsonArray rels = QJsonDocument::fromJson(s.raw).array();
+        QJsonObject chosen;
+        if (ch == QLatin1String("dev")) {
+            if (!rels.isEmpty()) { chosen = rels.first().toObject(); }
+        } else {
+            for (const QJsonValue &rv : rels) {
+                const QJsonObject r = rv.toObject();
+                if (!r.value(QStringLiteral("prerelease")).toBool()) { chosen = r; break; }
+            }
+            if (chosen.isEmpty() && !rels.isEmpty()) { chosen = rels.first().toObject(); }
+        }
+        if (!chosen.isEmpty()) {
+            s.latest = chosen.value(QStringLiteral("tag_name")).toString();
+            QString bestUrl, bestName, anyUrl, anyName;
+            for (const QJsonValue &av : chosen.value(QStringLiteral("assets")).toArray()) {
+                const QJsonObject a = av.toObject();
+                const QString name = a.value(QStringLiteral("name")).toString();
+                if (!name.endsWith(QLatin1String(".tgz"))) { continue; }
+                const QString dl = a.value(QStringLiteral("browser_download_url")).toString();
+                if (anyName.isEmpty() || name.size() < anyName.size()) { anyName = name; anyUrl = dl; }
+                if (name.contains(QLatin1String("f7")) && name.contains(QLatin1String("update"))) {
+                    if (bestName.isEmpty() || name.size() < bestName.size()) { bestName = name; bestUrl = dl; }
+                }
+            }
+            s.tgzUrl = bestUrl.isEmpty() ? anyUrl : bestUrl;
+        }
+    }
+
+    s.status = (!s.latest.isEmpty() && !s.tgzUrl.isEmpty()) ? QStringLiteral("ready")
+                                                            : QStringLiteral("error");
+}
+
+void FirmwareStore::cycleChannel(int index)
+{
+    if (index < 0 || index >= m_sources.size()) { return; }
+    Source &s = m_sources[index];
+    if (s.channels.size() < 2) { return; }
+    int i = s.channels.indexOf(currentChannelId(s));
+    i = (i + 1) % s.channels.size();
+    s.wantChannel = s.channels.at(i);
+    QSettings().setValue(QStringLiteral("firmware/ch/") + s.name, s.wantChannel);
+    deriveFromCache(index);   // every channel is already cached -> instant, no re-fetch
+    emit changed();
+}
+
+void FirmwareStore::install(int index)
+{
+    if (index < 0 || index >= m_sources.size()) { return; }
+    const Source src = m_sources.at(index);
+
+    if (src.status != QLatin1String("ready") || src.tgzUrl.isEmpty()) {
+        emit failed(index, QStringLiteral("No downloadable build found -- try re-checking."));
+        return;
+    }
+    if (m_busy) {
+        emit failed(index, QStringLiteral("A download is already in progress."));
+        return;
+    }
+
+    QString dir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    if (dir.isEmpty()) { dir = QDir::tempPath(); }
+    dir += QStringLiteral("/firmware");
+    QDir().mkpath(dir);
+
+    const QUrl url(src.tgzUrl);
+    QString fileName = url.fileName();
+    if (fileName.isEmpty() || !fileName.endsWith(QLatin1String(".tgz"))) {
+        fileName = QStringLiteral("flipper-z-f7-update.tgz");
+    }
+    const QString outPath = dir + QStringLiteral("/") + fileName;
+
+    QNetworkRequest req(url);
+    req.setRawHeader("User-Agent", "Hyper-Zero-UI");
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+
+    setBusy(true);
+    emit progress(index, 0.0, QStringLiteral("Downloading %1…").arg(src.latest));
+
+    QNetworkReply *reply = m_net.get(req);
+    connect(reply, &QNetworkReply::downloadProgress, this, [this, index](qint64 rec, qint64 total) {
+        const qreal frac = (total > 0) ? (qreal)rec / (qreal)total : 0.0;
+        emit progress(index, frac, QStringLiteral("Downloading…"));
+    });
+    connect(reply, &QNetworkReply::finished, this, [this, reply, index, outPath]() {
+        reply->deleteLater();
+        setBusy(false);
+        if (reply->error() != QNetworkReply::NoError) {
+            emit failed(index, QStringLiteral("Download failed: %1").arg(reply->errorString()));
+            return;
+        }
+        QFile f(outPath);
+        if (!f.open(QIODevice::WriteOnly)) {
+            emit failed(index, QStringLiteral("Couldn't save the download to disk."));
+            return;
+        }
+        f.write(reply->readAll());
+        f.close();
+        emit progress(index, 1.0, QStringLiteral("Ready -- flashing…"));
+        emit readyToInstall(QUrl::fromLocalFile(outPath).toString());
+    });
 }

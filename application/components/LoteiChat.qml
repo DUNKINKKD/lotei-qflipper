@@ -14,7 +14,7 @@ Rectangle {
 
     readonly property int dockX: 28
     readonly property int dockY: 250
-    readonly property int dockW: 396
+    readonly property int dockW: 424
     readonly property int dockH: 130
     readonly property int minH: 44
 
@@ -22,7 +22,9 @@ Rectangle {
     property int streamIdx: -1   // index of the message currently being streamed
     property bool showScreen: false   // mirror the live Flipper screen in-panel
     // The assistant takes the connected Flipper's name as its own (fallback LOTEI).
-    readonly property string aiName: (Backend.deviceState && Backend.deviceState.info && Backend.deviceState.info.name && Backend.deviceState.info.name.length > 0) ? Backend.deviceState.info.name : "LOTEI"
+    readonly property string aiName: (Backend.deviceState && Backend.deviceState.info && Backend.deviceState.info.name && Backend.deviceState.info.name.length > 0)
+                                     ? Backend.deviceState.info.name
+                                     : (Lotei.manualName.length > 0 ? Lotei.manualName : "LOTEI")
 
     x: dockX
     y: viewState === "max" ? 76 : dockY
@@ -135,7 +137,7 @@ Rectangle {
         // ---- header: name + status + window buttons ----
         RowLayout {
             Layout.fillWidth: true
-            spacing: 8
+            spacing: 5
 
             Text {
                 text: root.aiName
@@ -150,6 +152,22 @@ Rectangle {
                 font.family: "Share Tech Mono"
                 font.pixelSize: 12
                 Layout.alignment: Qt.AlignVCenter
+            }
+            // click-to-cycle local AI model (Ollama)
+            Text {
+                text: Lotei.modelName
+                color: modelMouse.containsMouse ? Theme.color.lightorange2 : Theme.color.mediumorange4
+                font.family: "Share Tech Mono"
+                font.pixelSize: 11
+                Layout.alignment: Qt.AlignVCenter
+                MouseArea {
+                    id: modelMouse
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Lotei.cycleModel()
+                }
             }
             Text {
                 text: "voice"
@@ -172,6 +190,8 @@ Rectangle {
                 color: voiceNameMouse.containsMouse ? Theme.color.lightorange2 : Theme.color.mediumorange4
                 font.family: "Share Tech Mono"
                 font.pixelSize: 11
+                elide: Text.ElideRight
+                Layout.maximumWidth: 84
                 Layout.alignment: Qt.AlignVCenter
                 MouseArea {
                     id: voiceNameMouse
@@ -188,7 +208,7 @@ Rectangle {
                 id: voiceVol
                 visible: !Lotei.muted
                 Layout.alignment: Qt.AlignVCenter
-                implicitWidth: 46
+                implicitWidth: 40
                 implicitHeight: 16
                 Rectangle {   // track
                     anchors.verticalCenter: parent.verticalCenter

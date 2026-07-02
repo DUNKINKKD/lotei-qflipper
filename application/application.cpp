@@ -210,6 +210,7 @@ void Application::initQmlTypes()
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "Backend", &m_backend);
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "Lotei", &m_lotei);
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "Palette", &m_palette);
+    qmlRegisterSingletonInstance("QFlipper", 1, 0, "Firmware", &m_firmware);
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "App", this);
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "SystemFileDialog", &m_fileDialog);
 }

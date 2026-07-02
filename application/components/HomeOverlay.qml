@@ -279,6 +279,17 @@ AbstractOverlay {
         action: installFromFileAction
     }
 
+    LinkButton {
+        id: customFwButton
+        x: Math.round(centerX - width / 2)
+
+        anchors.top: fileButton.bottom
+        anchors.topMargin: -6
+
+        linkColor: Theme.color.lightorange2
+        action: customFirmwareAction
+    }
+
     Action {
         id: updateButtonAction
 
@@ -341,6 +352,12 @@ AbstractOverlay {
        id: installFromFileAction
        text: qsTr("Install from file")
        onTriggered: installFromFile()
+    }
+
+    Action {
+       id: customFirmwareAction
+       text: qsTr("Custom firmware")
+       onTriggered: Firmware.open = true
     }
 
     function updateButtonFunc() {

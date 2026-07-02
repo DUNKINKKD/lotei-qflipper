@@ -75,6 +75,7 @@ private:
     ApplicationBackend m_backend;
     LoteiBackend m_lotei;
     LoteiPalette m_palette;
+    FirmwareStore m_firmware;
     QQmlApplicationEngine m_engine;
 
     bool m_isDeveloperMode;

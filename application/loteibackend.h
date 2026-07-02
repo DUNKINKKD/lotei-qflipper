@@ -29,8 +29,12 @@ class LoteiBackend : public QObject
     Q_PROPERTY(bool configured READ configured CONSTANT)
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
     Q_PROPERTY(QString voiceName READ voiceName NOTIFY voiceChanged)
+    Q_PROPERTY(QString modelName READ modelName NOTIFY modelChanged)
     Q_PROPERTY(qreal voiceVolume READ voiceVolume WRITE setVoiceVolume NOTIFY voiceVolumeChanged)
     Q_PROPERTY(qreal musicVolume READ musicVolume WRITE setMusicVolume NOTIFY musicVolumeChanged)
+    Q_PROPERTY(bool setupComplete READ setupComplete NOTIFY setupCompleteChanged)
+    Q_PROPERTY(bool ollamaOnline READ ollamaOnline NOTIFY modelChanged)
+    Q_PROPERTY(QString manualName READ manualName WRITE setManualName NOTIFY manualNameChanged)
 
 public:
     explicit LoteiBackend(QObject *parent = nullptr);
@@ -43,15 +47,31 @@ public:
     bool muted() const;
     void setMuted(bool value);
     QString voiceName() const;
+    QString modelName() const;
     qreal voiceVolume() const;
     void setVoiceVolume(qreal value);
     qreal musicVolume() const;
     void setMusicVolume(qreal value);
+    bool setupComplete() const;
+    bool ollamaOnline() const;
+    QString manualName() const;
+    void setManualName(const QString &name);
 
     Q_INVOKABLE void send(const QString &userText, const QString &deviceContext);
     Q_INVOKABLE void reset();
     Q_INVOKABLE void cycleVoice();
+    Q_INVOKABLE void cycleModel();                    // switch to the next installed Ollama model
+    Q_INVOKABLE void setModel(const QString &model);  // pick a specific model
+    Q_INVOKABLE QStringList availableModels() const;  // models installed in Ollama
     Q_INVOKABLE QString musicFolderUrl() const;   // <appdir>/Music as a file URL
+
+    // First-run setup wizard
+    Q_INVOKABLE void completeSetup();                    // mark the wizard done
+    Q_INVOKABLE void resetSetup();                       // re-trigger the wizard (testing)
+    Q_INVOKABLE void recheckOllama();                    // re-query /api/tags (AI step)
+    Q_INVOKABLE QStringList personalityPresets() const;  // preset persona names
+    Q_INVOKABLE void applyPreset(const QString &name);   // set persona to a preset
+    Q_INVOKABLE void applyNamePersonality();             // persona built from the Flipper's name
 
 signals:
     void replyReceived(const QString &text);
@@ -59,8 +79,11 @@ signals:
     void thinkingChanged();
     void mutedChanged();
     void voiceChanged();
+    void modelChanged();
     void voiceVolumeChanged();
     void musicVolumeChanged();
+    void setupCompleteChanged();
+    void manualNameChanged();
     void partialReceived(const QString &text);   // live-typing: reply text so far
 
 private:
@@ -71,6 +94,7 @@ private:
     void speakWithPiper(const QString &spoken, const QString &moodText);
     double piperLengthScale(const QString &moodText) const;
     void discoverPiper();
+    void refreshModels();   // query Ollama /api/tags for installed models
 
     void loadHistory();   // restore past conversation from disk
     void saveHistory();   // persist conversation (user + final replies only)
@@ -93,6 +117,11 @@ private:
     bool       m_muted = false;
     qreal      m_voiceVolume = 1.0;
     qreal      m_musicVolume = 0.55;
+    QString     m_model;    // selected Ollama model (persisted)
+    QStringList m_models;   // models discovered via /api/tags
+    bool        m_setupComplete = false;
+    bool        m_ollamaOnline = false;
+    QString     m_manualName;   // Flipper name from setup (fallback when no device)
     QTextToSpeech m_tts;   // SAPI fallback engine
 
     // Piper neural TTS (primary, when piper.exe + voices sit next to the app)
@@ -140,4 +169,62 @@ private:
     QVariantMap m_colors;
     QStringList m_order;
     QTimer     *m_saveTimer = nullptr;
+};
+
+// Tracks community Flipper firmwares (Official, Momentum, Unleashed, RogueMaster),
+// fetches each one's latest version live, and downloads the update .tgz so
+// qFlipper's normal installer (ApplicationBackend::installFirmware) can flash it.
+// A Flipper runs one firmware at a time -- this makes the latest build of any
+// fork one click away; it never flashes without an explicit click.
+class FirmwareStore : public QObject
+{
+    Q_OBJECT
+    Q_PROPERTY(bool open READ isOpen WRITE setOpen NOTIFY openChanged)
+    Q_PROPERTY(QVariantList sources READ sources NOTIFY changed)
+    Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
+
+public:
+    explicit FirmwareStore(QObject *parent = nullptr);
+
+    bool isOpen() const { return m_open; }
+    void setOpen(bool value);
+    QVariantList sources() const;
+    bool busy() const { return m_busy; }
+
+    Q_INVOKABLE void refresh();               // (re)fetch the latest version of every source
+    Q_INVOKABLE void install(int index);      // download that source's latest .tgz
+    Q_INVOKABLE void cycleChannel(int index); // switch a source's channel (release/dev/rc)
+
+signals:
+    void openChanged();
+    void changed();
+    void busyChanged();
+    void readyToInstall(const QString &fileUrl);              // hand off to Backend.installFirmware
+    void progress(int index, qreal frac, const QString &note);
+    void failed(int index, const QString &message);
+
+private:
+    enum class Kind { DirJson, GitHub };
+    struct Source {
+        QString     name;
+        Kind        kind;
+        QString     locator;      // directory.json URL, or "owner/repo" for GitHub
+        QString     blurb;
+        QStringList channels;     // available channel ids (discovered for DirJson, fixed for GitHub)
+        QString     wantChannel;  // user-selected channel id (persisted); default "release"
+        QString     latest;       // discovered version for the selected channel
+        QString     tgzUrl;       // discovered download URL for the selected channel
+        QString     status;       // "", "checking", "ready", "error"
+        QByteArray  raw;          // cached payload, so channel switches need no re-fetch
+    };
+
+    void fetchOne(int index);
+    void deriveFromCache(int index);                  // recompute latest/tgz for the chosen channel
+    QString currentChannelId(const Source &s) const;  // wantChannel, clamped to what's available
+    void setBusy(bool value);
+
+    QNetworkAccessManager m_net;
+    QList<Source> m_sources;
+    bool m_open = false;
+    bool m_busy = false;
 };
