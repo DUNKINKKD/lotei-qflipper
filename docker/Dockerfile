@@ -50,7 +50,9 @@ RUN DEBIAN_FRONTEND=noninteractive apt -y install \
     qtshadertools6-static \
     qtsvg6-static \
     qttools6-static \
-    qt5compat6-static
+    qt5compat6-static \
+    qtmultimedia6-static \
+    qtspeech6-static
 
 RUN wget https://update.flipperzero.one/builds/misc/linuxdeploy-x86_64-29092022.AppImage \
     -O /usr/bin/linuxdeploy && chmod +x /usr/bin/linuxdeploy
