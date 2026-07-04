@@ -23,7 +23,15 @@ make install
 # the app imports (our QML is compiled into the binary, so it can't scan that).
 export QML_SOURCES_PATHS="$PWD/../application"
 
+# Qt's OpenSSL TLS backend is a plugin that dlopen()s libssl at runtime, so
+# linuxdeploy's dependency scan never sees it. Deploy the tls plugin AND
+# force-bundle libssl/libcrypto, or every HTTPS request fails on Linux with
+# "the backend named 'cert-only' does not support TLS".
+export EXTRA_QT_PLUGINS="tls"
+
 linuxdeploy --appdir="$APPDIR" \
     --plugin qt \
+    --library=/usr/lib/x86_64-linux-gnu/libssl.so.3 \
+    --library=/usr/lib/x86_64-linux-gnu/libcrypto.so.3 \
     --custom-apprun="../installer-assets/appimage/AppRun" \
     --output appimage
