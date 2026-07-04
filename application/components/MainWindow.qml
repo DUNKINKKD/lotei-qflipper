@@ -323,8 +323,14 @@ Item {
             }
         }
 
-        MusicPlayer {
-            Layout.preferredWidth: 250
+        // Music needs QtMultimedia, which is Windows-only in this build. On Linux
+        // Lotei.hasAudio is false, so the player (and its QtMultimedia import) is
+        // never loaded and the slot collapses.
+        Loader {
+            active: Lotei.hasAudio
+            source: Lotei.hasAudio ? "qrc:/components/MusicPlayer.qml" : ""
+            visible: active
+            Layout.preferredWidth: active ? 250 : 0
             Layout.fillHeight: true
         }
 

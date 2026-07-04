@@ -14,8 +14,10 @@
 #include <QProcess>
 #include <QFileInfo>
 #include <QCoreApplication>
+#ifdef HZUI_VOICE
 #include <QMediaPlayer>
 #include <QAudioOutput>
+#endif
 
 #include "applicationbackend.h"
 #include "abstractoperation.h"
@@ -259,7 +261,9 @@ static QJsonArray loteiTools()
 
 LoteiBackend::LoteiBackend(QObject *parent)
     : QObject(parent)
+#ifdef HZUI_VOICE
     , m_tts(QStringLiteral("sapi"))   // classic Windows SAPI engine (reliable on desktop)
+#endif
 {
     m_net.setTransferTimeout(0);
     loadHistory();
@@ -269,6 +273,7 @@ LoteiBackend::LoteiBackend(QObject *parent)
     m_model = QSettings().value(QStringLiteral("lotei/model"), QString::fromUtf8(LOTEI_MODEL)).toString();
     m_setupComplete = QSettings().value(QStringLiteral("lotei/setupComplete"), false).toBool();
     m_manualName = QSettings().value(QStringLiteral("lotei/manualName")).toString();
+#ifdef HZUI_VOICE
     m_tts.setVolume(m_voiceVolume);
 
     // Piper playback chain + voice discovery (falls back to SAPI if absent).
@@ -282,10 +287,12 @@ LoteiBackend::LoteiBackend(QObject *parent)
     connect(m_voicePlayer, &QMediaPlayer::mediaStatusChanged, this, [this](QMediaPlayer::MediaStatus s) {
         if (s == QMediaPlayer::LoadedMedia && !m_muted) { m_voicePlayer->play(); }
     });
+#endif
     m_voiceTmpDir = QDir::tempPath() + QStringLiteral("/lotei-voice");
     QDir().mkpath(m_voiceTmpDir);
     discoverPiper();
     refreshModels();   // discover installed Ollama models (async; harmless if Ollama's down)
+#ifdef HZUI_VOICE
     // Restore the saved voice once the TTS engine has enumerated its voices.
     QTimer::singleShot(1200, this, [this]() {
         const QString saved = QSettings().value(QStringLiteral("lotei/voice")).toString();
@@ -297,6 +304,16 @@ LoteiBackend::LoteiBackend(QObject *parent)
         }
         emit voiceChanged();
     });
+#endif
+}
+
+bool LoteiBackend::hasAudio() const
+{
+#ifdef HZUI_VOICE
+    return true;
+#else
+    return false;
+#endif
 }
 
 void LoteiBackend::setAppBackend(ApplicationBackend *backend) { m_appBackend = backend; }
@@ -311,9 +328,11 @@ void LoteiBackend::setMuted(bool value)
         m_muted = value;
         QSettings().setValue(QStringLiteral("lotei/muted"), value);
         if (value) {
+#ifdef HZUI_VOICE
             m_tts.stop();
             if (m_voicePlayer) { m_voicePlayer->stop(); }
             if (m_piperProc) { m_piperProc->kill(); }
+#endif
         }
         emit mutedChanged();
     }
@@ -326,8 +345,10 @@ void LoteiBackend::setVoiceVolume(qreal value)
     value = qBound(0.0, value, 1.0);
     if (qAbs(value - m_voiceVolume) > 0.001) {
         m_voiceVolume = value;
+#ifdef HZUI_VOICE
         m_tts.setVolume(value);
         if (m_voiceAudio) { m_voiceAudio->setVolume(value); }
+#endif
         QSettings().setValue(QStringLiteral("lotei/voiceVolume"), value);
         emit voiceVolumeChanged();
     }
@@ -377,8 +398,12 @@ void LoteiBackend::applyProsody(const QString &text)
     // control, so it fakes pitch by wrapping the text in SSML and speaking with
     // SPF_IS_XML -- which silences output the moment the text has an XML-special
     // char. Rate + volume go through SAPI's direct SetRate/SetVolume, so safe.
+#ifdef HZUI_VOICE
     m_tts.setRate(qBound(-1.0, rate, 1.0));
     m_tts.setVolume(qBound(0.0, vol, 1.0));
+#else
+    Q_UNUSED(rate); Q_UNUSED(vol);
+#endif
 }
 
 void LoteiBackend::discoverPiper()
@@ -423,6 +448,7 @@ double LoteiBackend::piperLengthScale(const QString &moodText) const
 
 void LoteiBackend::speak(const QString &text)
 {
+#ifdef HZUI_VOICE
     const QString spoken = cleanForSpeech(text);
     if (spoken.isEmpty()) { return; }
     if (m_piperOk) {
@@ -432,10 +458,14 @@ void LoteiBackend::speak(const QString &text)
         m_tts.stop();
         m_tts.say(spoken);
     }
+#else
+    Q_UNUSED(text);
+#endif
 }
 
 void LoteiBackend::speakWithPiper(const QString &spoken, const QString &moodText)
 {
+#ifdef HZUI_VOICE
     if (m_piperVoices.isEmpty()) { return; }
 
     // Cancel any synth/playback still in flight.
@@ -466,6 +496,9 @@ void LoteiBackend::speakWithPiper(const QString &spoken, const QString &moodText
     m_piperProc->write(spoken.toUtf8());
     m_piperProc->write("\n");
     m_piperProc->closeWriteChannel();
+#else
+    Q_UNUSED(spoken); Q_UNUSED(moodText);
+#endif
 }
 
 QString LoteiBackend::musicFolderUrl() const
@@ -478,15 +511,20 @@ QString LoteiBackend::voiceName() const
     if (m_piperOk && !m_piperVoices.isEmpty()) {
         return piperVoiceLabel(m_piperVoices.at(qBound(0, m_piperVoiceIdx, m_piperVoices.size() - 1)));
     }
+#ifdef HZUI_VOICE
     QString n = m_tts.voice().name();
     n.remove(QStringLiteral("Microsoft "));
     n.remove(QStringLiteral(" Desktop"));
     n = n.trimmed();
     return n.isEmpty() ? QStringLiteral("default") : n;
+#else
+    return QStringLiteral("off");
+#endif
 }
 
 void LoteiBackend::cycleVoice()
 {
+#ifdef HZUI_VOICE
     if (m_piperOk && !m_piperVoices.isEmpty()) {
         m_piperVoiceIdx = (m_piperVoiceIdx + 1) % m_piperVoices.size();
         QSettings().setValue(QStringLiteral("lotei/piperVoice"),
@@ -515,6 +553,7 @@ void LoteiBackend::cycleVoice()
         m_tts.stop();
         m_tts.say(sample);
     }
+#endif
 }
 
 QString LoteiBackend::modelName() const

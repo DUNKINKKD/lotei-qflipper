@@ -1,4 +1,15 @@
-QT += quick serialport widgets quickcontrols2 svg network texttospeech multimedia
+QT += quick serialport widgets quickcontrols2 svg network
+
+# LOTEI's voice (Piper/SAPI) and the music player both need QtMultimedia /
+# QtTextToSpeech. Those modules aren't in the Linux static-Qt build image, so
+# audio is Windows-only for now; HZUI_VOICE gates the code + the MusicPlayer.qml
+# resource (see loteibackend.* and MainWindow.qml). Linux still gets everything
+# else (chat, colors, firmware manager, screen mirror, ...).
+win32 {
+    QT += texttospeech multimedia
+    DEFINES += HZUI_VOICE
+    RESOURCES += music.qrc
+}
 
 include(../qflipper_common.pri)
 
@@ -73,6 +84,10 @@ win32 {
         } else {
             VERSION = $$GIT_VERSION
         }
+
+        # Strip a leading "v"/"V" (e.g. tag "V1.1.0") so the numeric Windows
+        # FILEVERSION resource stays valid -- rc.exe rejects non-numeric versions.
+        VERSION = $$replace(VERSION, ^[vV], )
 
     } else: VERSION = 0.0.0
 }

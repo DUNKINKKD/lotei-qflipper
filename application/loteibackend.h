@@ -10,8 +10,10 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
+#ifdef HZUI_VOICE
 #include <QTextToSpeech>
 #include <QVoice>
+#endif
 #include <QTimer>
 
 class ApplicationBackend;
@@ -27,6 +29,7 @@ class LoteiBackend : public QObject
     Q_OBJECT
     Q_PROPERTY(bool thinking READ thinking NOTIFY thinkingChanged)
     Q_PROPERTY(bool configured READ configured CONSTANT)
+    Q_PROPERTY(bool hasAudio READ hasAudio CONSTANT)   // false on Linux (no QtMultimedia): hides voice + music
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
     Q_PROPERTY(QString voiceName READ voiceName NOTIFY voiceChanged)
     Q_PROPERTY(QString modelName READ modelName NOTIFY modelChanged)
@@ -44,6 +47,7 @@ public:
 
     bool thinking() const;
     bool configured() const;
+    bool hasAudio() const;   // true only where voice/music (QtMultimedia) is compiled in
     bool muted() const;
     void setMuted(bool value);
     QString voiceName() const;
@@ -122,7 +126,9 @@ private:
     bool        m_setupComplete = false;
     bool        m_ollamaOnline = false;
     QString     m_manualName;   // Flipper name from setup (fallback when no device)
+#ifdef HZUI_VOICE
     QTextToSpeech m_tts;   // SAPI fallback engine
+#endif
 
     // Piper neural TTS (primary, when piper.exe + voices sit next to the app)
     bool          m_piperOk = false;
