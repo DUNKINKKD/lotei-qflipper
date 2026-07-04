@@ -1,0 +1,8 @@
+# Keep shell scripts + the AppImage launcher LF so they run on the Linux CI
+# runner regardless of the committer's platform (CRLF breaks /bin/bash).
+*.sh                              text eol=lf
+build_linux.sh                    text eol=lf
+build_mac.sh                      text eol=lf
+installer-assets/appimage/AppRun  text eol=lf
+docker/Dockerfile                 text eol=lf
+docker/init.sh                    text eol=lf

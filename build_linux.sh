@@ -1,31 +1,29 @@
 #!/bin/bash
 
-set -euxo pipefail;
+set -euxo pipefail
 
 TARGET="qFlipper"
 BUILDDIR="build"
-APPDIR_PREFIX="$PWD/$BUILDDIR/AppDir/usr"
-
-LIBSSL1_OVERRIDE="$(ldconfig -p | grep x86-64 | grep -oP '/[^\s]+/libssl.so.1.1' | head -n1)"
-
-LIBWAYLAND_EXCLUDE="libwayland*"
-LIBXCB_EXCLUDE="libxcb*"
-LIBXKB_EXCLUDE="libxkb*"
-LIBX11_EXCLUDE="libX*"
+APPDIR="$PWD/$BUILDDIR/AppDir"
 
 export OUTPUT="$TARGET-x86_64.AppImage"
+# linuxdeploy + its qt plugin are AppImages; in Docker (no FUSE) they must
+# self-extract to run.
+export APPIMAGE_EXTRACT_AND_RUN=1
 
 mkdir -p "$BUILDDIR" && cd "$BUILDDIR"
 
-qmake "../$TARGET.pro" -spec linux-g++ "CONFIG+=release qtquickcompiler" PREFIX="$APPDIR_PREFIX"
+qmake "../$TARGET.pro" -spec linux-g++ "CONFIG+=release qtquickcompiler" PREFIX="$APPDIR/usr"
 make qmake_all
 make -j"$(nproc)"
 make install
 
-linuxdeploy --appdir=AppDir -o appimage \
+# Bundle the dynamic Qt runtime (libs, xcb platform plugin, QML imports) into
+# the AppDir. QML_SOURCES_PATHS lets the qt plugin discover which QML modules
+# the app imports (our QML is compiled into the binary, so it can't scan that).
+export QML_SOURCES_PATHS="$PWD/../application"
+
+linuxdeploy --appdir="$APPDIR" \
+    --plugin qt \
     --custom-apprun="../installer-assets/appimage/AppRun" \
-    --library="$LIBSSL1_OVERRIDE" \
-    --exclude-library="$LIBWAYLAND_EXCLUDE" \
-    --exclude-library="$LIBXCB_EXCLUDE" \
-    --exclude-library="$LIBXKB_EXCLUDE" \
-    --exclude-library="$LIBX11_EXCLUDE"
+    --output appimage

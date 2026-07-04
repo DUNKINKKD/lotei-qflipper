@@ -1,69 +1,41 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
+
+# The upstream static-Qt repo (OBS home:drunkbatya / xUbuntu_20.04) was taken
+# down, which broke the old Linux build. Instead we fetch official Qt 6.4.2
+# (dynamic) with aqtinstall and bundle it with linuxdeploy-plugin-qt at package
+# time. See build_linux.sh.
 
 WORKDIR /project
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN DEBIAN_FRONTEND=noninteractive apt update
-RUN DEBIAN_FRONTEND=noninteractive apt install -y \
-    software-properties-common \
-    wget \
-    file \
-    pkg-config \
-    git \
-    curl \
+# Toolchain + Qt platform (xcb/GL) + libusb (DFU backend) + fuse (AppImage) deps.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential git curl wget file ca-certificates pkg-config \
+    python3 python3-pip \
+    libgl1-mesa-dev libglx-dev libopengl-dev libegl-dev \
+    libxkbcommon-dev libxkbcommon-x11-dev \
+    libxcb1-dev libxcb-cursor-dev libxcb-glx0-dev libxcb-icccm4-dev \
+    libxcb-image0-dev libxcb-keysyms1-dev libxcb-randr0-dev \
+    libxcb-render-util0-dev libxcb-shape0-dev libxcb-sync-dev \
+    libxcb-util-dev libxcb-xfixes0-dev libxcb-xinerama0-dev libxcb-xkb-dev \
+    libx11-xcb-dev libsm-dev libice-dev \
+    libdbus-1-dev libfontconfig1-dev libfreetype6-dev \
+    libusb-1.0-0-dev zlib1g-dev \
     libfuse2 \
-    zlib1g-dev \
-    libusb-1.0-0-dev \
-    ca-certificates \
-    build-essential \
-    libgl-dev \
-    libxkbcommon-x11-dev \
-    libxcb-icccm4-dev \
-    libxcb-image0-dev \
-    libxcb-keysyms1-dev \
-    libxcb-randr0-dev \
-    libxcb-render-util0-dev \
-    libxcb-sync-dev \
-    libdbus-1-dev \
-    libmd4c-dev \
-    libegl-dev \
-    libxcb-xfixes0-dev \
-    libsm-dev \
-    libice-dev \
-    libxcb-glx0-dev \
-    libdrm-dev \
-    libx11-xcb-dev \
-    libopengl-dev \
-    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    && rm -rf /var/lib/apt/lists/*
 
-RUN echo 'deb http://download.opensuse.org/repositories/home:drunkbatya/xUbuntu_20.04/ /' \
-    | tee /etc/apt/sources.list.d/home:drunkbatya.list
-RUN curl -fsSL https://download.opensuse.org/repositories/home:drunkbatya/xUbuntu_20.04/Release.key \
-    | gpg --dearmor | tee /etc/apt/trusted.gpg.d/home_drunkbatya.gpg > /dev/null
+# Qt 6.4.2 (dynamic) via aqtinstall. Base gcc_64 install covers qtbase +
+# qtdeclarative (Quick/Controls2) + qtsvg; the rest are explicit modules.
+RUN pip3 install --no-cache-dir aqtinstall
+RUN aqt install-qt linux desktop 6.4.2 gcc_64 \
+        -m qtserialport qt5compat qtimageformats \
+        -O /opt/qt
+ENV QTDIR="/opt/qt/6.4.2/gcc_64"
+ENV PATH="/opt/qt/6.4.2/gcc_64/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/opt/qt/6.4.2/gcc_64/lib"
 
-RUN DEBIAN_FRONTEND=noninteractive apt update
-RUN DEBIAN_FRONTEND=noninteractive apt -y install \
-    qtbase6-static \
-    qtwayland6-static \
-    qt3d6-static \
-    qtdeclarative6-static \
-    qtserialport6-static \
-    qtshadertools6-static \
-    qtsvg6-static \
-    qttools6-static \
-    qt5compat6-static
-
-RUN wget https://update.flipperzero.one/builds/misc/linuxdeploy-x86_64-29092022.AppImage \
-    -O /usr/bin/linuxdeploy && chmod +x /usr/bin/linuxdeploy
-
-RUN wget https://update.flipperzero.one/builds/misc/linuxdeploy-plugin-qt-x86_64-29092022.AppImage \
-    -O /usr/bin/linuxdeploy-plugin-qt && chmod +x /usr/bin/linuxdeploy-plugin-qt
-
-RUN git config --global --replace-all safe.directory '*'
-
-ENV QT_BASE_DIR=/opt/qt6.4-static
-
-ENV PATH="${QT_BASE_DIR}/bin:${PATH}"
-
-COPY init.sh /init.sh
-
-ENTRYPOINT ["/init.sh"]
+# AppImage packaging tooling.
+RUN wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage" \
+        -O /usr/local/bin/linuxdeploy && chmod +x /usr/local/bin/linuxdeploy
+RUN wget -q "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage" \
+        -O /usr/local/bin/linuxdeploy-plugin-qt && chmod +x /usr/local/bin/linuxdeploy-plugin-qt

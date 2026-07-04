@@ -8,6 +8,17 @@ export QT_QPA_PLATFORMTHEME=xdgdesktopportal
 THIS_DIR="$(readlink -f "$(dirname "$0")")"
 APPIMAGE_NAME="$(basename "$APPIMAGE")"
 
+# Load linuxdeploy-plugin-qt's environment hooks (LD_LIBRARY_PATH, QT_PLUGIN_PATH,
+# QML import paths) so the bundled dynamic Qt is found before we launch.
+if [ -d "$THIS_DIR/apprun-hooks" ]; then
+    for _hook in "$THIS_DIR"/apprun-hooks/*.sh; do
+        if [ -r "$_hook" ]; then
+            # shellcheck disable=SC1090
+            source "$_hook"
+        fi
+    done
+fi
+
 RULES_FILE_NAME='42-flipperzero.rules'
 RULES_DIR=${3:-'/etc/udev/rules.d'}
 TARGET_RULES_FILE="$RULES_DIR/$RULES_FILE_NAME"
