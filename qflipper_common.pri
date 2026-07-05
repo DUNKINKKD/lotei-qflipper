@@ -48,3 +48,9 @@ DEFINES += APP_NAME=\\\"$$NAME\\\" \
            APP_TIMESTAMP=$$GIT_TIMESTAMP \
            PB_ENABLE_MALLOC
 
+# HZUI is a fork: qFlipper's built-in *app* self-updater points at the OFFICIAL
+# qFlipper server, so leaving it on lets users "update" HZUI straight into vanilla
+# qFlipper (wiping LOTEI). Disable it (upstream's own flag; the Nix package does
+# the same). Flipper *firmware* updates are a separate registry and stay enabled.
+DEFINES += DISABLE_APPLICATION_UPDATES
+
