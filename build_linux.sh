@@ -27,10 +27,15 @@ export QML_SOURCES_PATHS="$PWD/../application"
 # linuxdeploy's dependency scan never sees it. Deploy the tls plugin AND
 # force-bundle libssl/libcrypto, or every HTTPS request fails on Linux with
 # "the backend named 'cert-only' does not support TLS".
+# Qt 6.4.2's official binaries want OpenSSL *1.1* (libssl.so.1.1); bundle those
+# (installed from the focal .deb in the Dockerfile). The .so.3 pair is kept too,
+# harmlessly, for anything else that might link it.
 export EXTRA_QT_PLUGINS="tls"
 
 linuxdeploy --appdir="$APPDIR" \
     --plugin qt \
+    --library=/usr/lib/x86_64-linux-gnu/libssl.so.1.1 \
+    --library=/usr/lib/x86_64-linux-gnu/libcrypto.so.1.1 \
     --library=/usr/lib/x86_64-linux-gnu/libssl.so.3 \
     --library=/usr/lib/x86_64-linux-gnu/libcrypto.so.3 \
     --custom-apprun="../installer-assets/appimage/AppRun" \

@@ -34,6 +34,15 @@ ENV QTDIR="/opt/qt/6.4.2/gcc_64"
 ENV PATH="/opt/qt/6.4.2/gcc_64/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/opt/qt/6.4.2/gcc_64/lib"
 
+# Qt 6.4.2's official binaries were built against OpenSSL 1.1.1, so their TLS
+# backend dlopen()s libssl.so.1.1 / libcrypto.so.1.1. Ubuntu 22.04 only ships
+# OpenSSL 3, so pull the focal libssl1.1 package (build_linux.sh bundles it).
+# Without it every HTTPS request falls back to the "cert-only" backend and fails.
+RUN wget -q "http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2.24_amd64.deb" \
+        -O /tmp/libssl1.1.deb \
+    && (dpkg -i /tmp/libssl1.1.deb || apt-get update && apt-get install -f -y) \
+    && rm -f /tmp/libssl1.1.deb
+
 # AppImage packaging tooling.
 RUN wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage" \
         -O /usr/local/bin/linuxdeploy && chmod +x /usr/local/bin/linuxdeploy
