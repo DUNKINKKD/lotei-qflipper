@@ -34,7 +34,7 @@ public:
     ~BleSpike() override;
 
     // The real device registry, so a BLE Flipper can become the active device.
-    void setDeviceRegistry(Flipper::DeviceRegistry *registry) { m_reg = registry; }
+    void setDeviceRegistry(Flipper::DeviceRegistry *registry);
 
     QString status() const { return m_status; }
     QVariantList devices() const;

@@ -221,7 +221,7 @@ Item {
             }
         }
 
-        // BLE-connection spike (Phase 1) trigger
+        // BLE connection panel trigger
         TextLabel {
             id: bleButton
             anchors.top: parent.top
@@ -229,12 +229,12 @@ Item {
             anchors.leftMargin: 20
             anchors.topMargin: 10
 
-            color: Ble.connected ? Theme.color.lightgreen : Theme.color.lightorange2
-            opacity: bleMouse.containsMouse ? 1.0 : 0.5
+            color: (Ble.sessionActive || Ble.connected) ? Theme.color.lightgreen : Theme.color.lightorange2
+            opacity: (bleMouse.containsMouse || Ble.sessionActive) ? 1.0 : 0.5
 
             font.family: "ProggySquareTT"
             font.pixelSize: 16
-            text: "BLE"
+            text: Ble.sessionActive ? "BLE ●" : "BLE"
 
             MouseArea {
                 id: bleMouse

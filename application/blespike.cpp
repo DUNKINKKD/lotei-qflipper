@@ -303,6 +303,23 @@ void BleSpike::disconnectSession()
 
 // ---- Phase 3: the chosen Flipper becomes the app's ACTIVE device over BLE ----
 
+void BleSpike::setDeviceRegistry(Flipper::DeviceRegistry *registry)
+{
+    m_reg = registry;
+
+    if (m_reg) {
+        // Keep the panel's "session live" state honest: if our BLE device leaves
+        // the registry (link dropped -> auto-removed, or a USB device took over),
+        // clear the indicator.
+        connect(m_reg, &Flipper::DeviceRegistry::currentDeviceChanged, this, [this]() {
+            if (m_sessionActive && m_reg && !m_reg->hasBleDevice()) {
+                setSessionActive(false);
+                log(QStringLiteral("[main] BLE device disconnected."));
+            }
+        });
+    }
+}
+
 void BleSpike::connectDevice(int index)
 {
     if (index < 0 || index >= m_found.size()) { return; }

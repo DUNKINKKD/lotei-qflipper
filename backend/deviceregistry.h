@@ -27,6 +27,8 @@ public:
     FlipperZero *currentDevice() const;
     int deviceCount() const;
 
+    bool hasBleDevice() const;   // any registered device connected over BLE?
+
     BackendError::ErrorType error() const;
     void clearError();
 

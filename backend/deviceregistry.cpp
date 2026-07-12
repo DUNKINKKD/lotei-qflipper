@@ -4,9 +4,12 @@
 #include <QMetaObject>
 #include <QLoggingCategory>
 
+#include <memory>
+
 #include "flipperzero/helper/deviceinfohelper.h"
 #include "flipperzero/flipperzero.h"
 #include "flipperzero/devicestate.h"
+#include "flipperzero/protobufsession.h"
 
 #include "usbdevice.h"
 
@@ -48,6 +51,13 @@ FlipperZero *DeviceRegistry::currentDevice() const
 int DeviceRegistry::deviceCount() const
 {
     return m_devices.size();
+}
+
+bool DeviceRegistry::hasBleDevice() const
+{
+    return std::any_of(m_devices.begin(), m_devices.end(), [](Flipper::FlipperZero *dev) {
+        return dev->deviceState()->deviceInfo().isBle;
+    });
 }
 
 BackendError::ErrorType DeviceRegistry::error() const
@@ -146,7 +156,12 @@ void DeviceRegistry::removeBleDevice()
     }
 
     const auto idx = std::distance(m_devices.begin(), it);
-    qCDebug(LOG_DEVREG).noquote() << "BLE device disconnected:" << (*it)->deviceState()->name();
+    auto *device = *it;
+    qCDebug(LOG_DEVREG).noquote() << "BLE device disconnected:" << device->deviceState()->name();
+
+    // Stop watching its session so the drop-detection lambda can't fire again
+    // while the session tears itself down inside the device destructor.
+    disconnect(device->rpc(), nullptr, this, nullptr);
 
     m_devices.takeAt(idx)->deleteLater();
     emit deviceCountChanged();
@@ -196,6 +211,22 @@ void DeviceRegistry::processDevice()
 
         auto *device = new FlipperZero(info, this);
         m_devices.append(device);
+
+        if(info.isBle) {
+            // BLE has no USB-unplug event, so watch the device's own session:
+            // once it has been established and then drops, the link is gone --
+            // pull the device from the registry (the USB equivalent of unplug).
+            auto *rpc = device->rpc();
+            auto wasUp = std::make_shared<bool>(false);
+            connect(rpc, &Zero::ProtobufSession::sessionStateChanged, this, [this, rpc, wasUp]() {
+                if(rpc->isSessionUp()) {
+                    *wasUp = true;
+                } else if(*wasUp) {
+                    qCDebug(LOG_DEVREG) << "BLE session dropped";
+                    removeBleDevice();
+                }
+            });
+        }
 
         emit deviceCountChanged();
 
