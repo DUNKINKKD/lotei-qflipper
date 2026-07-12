@@ -64,6 +64,11 @@ public:
 
     void setSerialPort(const QSerialPortInfo &portInfo);
 
+    // Inject a pre-built transport (e.g. a BleTransport) to run the session over
+    // instead of opening a USB serial port from m_portInfo. Takes ownership.
+    // Must be called before startSession(); pass nullptr to revert to USB.
+    void setTransport(FlipperTransport *transport);
+
     void setMajorVersion(int versionMajor);
     void setMinorVersion(int versionMinor);
 
@@ -106,6 +111,7 @@ public slots:
     void stopSession();
 
 private slots:
+    void onTransportReady();
     void onSerialPortReadyRead();
     void onSerialPortBytesWriten(qint64 nbytes);
     void onSerialPortErrorOccured();

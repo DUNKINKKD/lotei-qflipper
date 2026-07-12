@@ -10,12 +10,14 @@ win32 {
     DEFINES += HZUI_VOICE
     RESOURCES += music.qrc
 
-    # BLE-connection spike (Phase 1) -- Windows-only for now so the Linux build
-    # doesn't need qtconnectivity yet. Gated behind HZUI_BLE.
+    # BLE connection -- Windows-only for now so the Linux build doesn't need
+    # qtconnectivity yet. Gated behind HZUI_BLE.
+    #   blespike     -- Phase 1 proof-of-transport (kept for the BLE test panel)
+    #   bletransport -- Phase 2 FlipperTransport impl the real session runs over
     QT += bluetooth
     DEFINES += HZUI_BLE
-    SOURCES += blespike.cpp
-    HEADERS += blespike.h
+    SOURCES += blespike.cpp bletransport.cpp
+    HEADERS += blespike.h bletransport.h
 }
 
 include(../qflipper_common.pri)

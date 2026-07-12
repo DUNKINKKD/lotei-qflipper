@@ -24,7 +24,14 @@ public:
     explicit FlipperTransport(QObject *parent = nullptr) : QObject(parent) {}
     ~FlipperTransport() override = default;
 
-    // Open/close the underlying link. open() returns false + sets errorString on failure.
+    // Open/close the underlying link.
+    //
+    // For a synchronous link (USB serial) open() returns true once the port is
+    // ready and callers may proceed immediately. For an asynchronous link (BLE,
+    // whose scan/connect/GATT-discovery take time) open() returns true to mean
+    // "kicked off successfully" and the transport later emits opened() when it is
+    // actually ready to carry RPC, or openFailed() if it could not connect.
+    // A false return (or openFailed) sets errorString.
     virtual bool open() = 0;
     virtual void close() = 0;
 
@@ -43,9 +50,11 @@ public:
     virtual QString errorString() const = 0;
 
 signals:
-    void readyRead();            // new bytes available -> readAll()
-    void bytesWritten(qint64 n); // n bytes physically sent
-    void errorOccurred();        // link error; inspect errorString()
+    void opened();                     // async link is now ready to carry RPC
+    void openFailed(const QString &e); // async link could not be established
+    void readyRead();                  // new bytes available -> readAll()
+    void bytesWritten(qint64 n);       // n bytes physically sent
+    void errorOccurred();              // link error; inspect errorString()
 };
 
 }

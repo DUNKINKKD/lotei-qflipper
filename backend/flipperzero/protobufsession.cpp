@@ -86,6 +86,23 @@ void ProtobufSession::setSerialPort(const QSerialPortInfo &portInfo)
     m_portInfo = portInfo;
 }
 
+void ProtobufSession::setTransport(FlipperTransport *transport)
+{
+    if(m_transport == transport) {
+        return;
+    }
+
+    if(m_transport) {
+        m_transport->deleteLater();
+    }
+
+    m_transport = transport;
+
+    if(m_transport) {
+        m_transport->setParent(this);
+    }
+}
+
 void ProtobufSession::setMajorVersion(int versionMajor)
 {
     m_versionMajor = versionMajor;
@@ -243,6 +260,24 @@ void ProtobufSession::startSession()
         return;
     }
 
+    // An injected transport (e.g. BleTransport) opens asynchronously: kick it off
+    // and let opened()/openFailed() drive the session live, rather than opening a
+    // USB serial port from m_portInfo.
+    if(m_transport) {
+        connect(m_transport, &FlipperTransport::opened, this, &ProtobufSession::onTransportReady, Qt::UniqueConnection);
+        connect(m_transport, &FlipperTransport::openFailed, this, [=](const QString &err) {
+            qCCritical(LOG_SESSION).noquote() << "Failed to start RPC session:" << err;
+            stopEarly(BackendError::SerialError, err);
+        }, Qt::UniqueConnection);
+
+        if(!m_transport->open()) {
+            qCCritical(LOG_SESSION).noquote() << "Failed to start RPC session:" << m_transport->errorString();
+            stopEarly(BackendError::SerialError, m_transport->errorString());
+        }
+
+        return;
+    }
+
     auto *helper = new SerialInitHelper(m_portInfo, this);
     connect(helper, &SerialInitHelper::finished, this, [=]() {
         helper->deleteLater();
@@ -254,20 +289,24 @@ void ProtobufSession::startSession()
         }
 
         m_transport = new SerialTransport(helper->serialPort(), this);
-
-        connect(m_transport, &FlipperTransport::readyRead, this, &ProtobufSession::onSerialPortReadyRead);
-        connect(m_transport, &FlipperTransport::bytesWritten, this, &ProtobufSession::onSerialPortBytesWriten);
-        connect(m_transport, &FlipperTransport::errorOccurred, this, &ProtobufSession::onSerialPortErrorOccured);
-
-        qCInfo(LOG_SESSION) << "RPC session started successfully.";
-
-        if(!m_queue.isEmpty()) {
-            setSessionState(Running);
-            QTimer::singleShot(0, this, &ProtobufSession::processQueue);
-        } else {
-            setSessionState(Idle);
-        }
+        onTransportReady();
     });
+}
+
+void ProtobufSession::onTransportReady()
+{
+    connect(m_transport, &FlipperTransport::readyRead, this, &ProtobufSession::onSerialPortReadyRead);
+    connect(m_transport, &FlipperTransport::bytesWritten, this, &ProtobufSession::onSerialPortBytesWriten);
+    connect(m_transport, &FlipperTransport::errorOccurred, this, &ProtobufSession::onSerialPortErrorOccured);
+
+    qCInfo(LOG_SESSION) << "RPC session started successfully.";
+
+    if(!m_queue.isEmpty()) {
+        setSessionState(Running);
+        QTimer::singleShot(0, this, &ProtobufSession::processQueue);
+    } else {
+        setSessionState(Idle);
+    }
 }
 
 void ProtobufSession::stopSession()
@@ -403,6 +442,7 @@ void ProtobufSession::doStopSession()
     if(m_transport) {
         m_transport->close();
         m_transport->deleteLater();
+        m_transport = nullptr;
     }
 
     unloadProtobufPlugin();
