@@ -123,6 +123,7 @@ private:
     qreal      m_musicVolume = 0.55;
     QString     m_model;    // selected Ollama model (persisted)
     QStringList m_models;   // models discovered via /api/tags
+    QStringList m_noToolModels;  // models Ollama rejects tools for (e.g. Gemma) -> chat-only
     bool        m_setupComplete = false;
     bool        m_ollamaOnline = false;
     QString     m_manualName;   // Flipper name from setup (fallback when no device)

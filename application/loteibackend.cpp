@@ -793,7 +793,11 @@ void LoteiBackend::dispatchToOllama()
     QJsonObject body;
     body["model"] = m_model;
     body["messages"] = messages;
-    body["tools"] = loteiTools();
+    // Some models (e.g. Gemma) don't support tool-calling and Ollama 400s the whole
+    // request if `tools` is present -> we drop it for those (see onStreamFinished).
+    if (!m_noToolModels.contains(m_model)) {
+        body["tools"] = loteiTools();
+    }
     body["stream"] = true;
     body["keep_alive"] = -1;
     body["options"] = QJsonObject{{"num_ctx", LOTEI_NUM_CTX}};
@@ -884,7 +888,18 @@ void LoteiBackend::onStreamFinished(QNetworkReply *reply)
     m_currentReply = nullptr;
     const auto netErr = reply->error();
     const QString netErrStr = reply->errorString();
+    const QByteArray errBody = m_streamBuf + reply->readAll();  // Ollama's error JSON lands here on a 4xx
     reply->deleteLater();
+
+    // Non-tool models (Gemma, etc.) make Ollama 400 the whole request because we
+    // send a `tools` array. Remember it and retry once WITHOUT tools, so the model
+    // still works as a chat-only companion (it just can't drive the Flipper).
+    if (netErr != QNetworkReply::NoError && errBody.contains("does not support tools")
+        && !m_noToolModels.contains(m_model)) {
+        m_noToolModels << m_model;
+        dispatchToOllama();   // re-send tools-less (dispatch now skips them for this model)
+        return;
+    }
 
     setThinking(false);
     if (netErr != QNetworkReply::NoError) {
