@@ -644,7 +644,7 @@ Item {
                         border.width: 1; border.color: Theme.color.mediumorange2
                         color: disMouse.containsMouse ? Theme.color.mediumorange2 : "transparent"
                         Text { anchors.centerIn: parent; text: "DISCONNECT"; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 12; font.bold: true }
-                        MouseArea { id: disMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Ble.disconnectSession() }
+                        MouseArea { id: disMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Ble.disconnectAll() }
                     }
                     Item { Layout.fillWidth: true }
                     Text {
@@ -654,7 +654,7 @@ Item {
                     }
                 }
 
-                Text { text: "devices (click one → opens a real RPC session over BLE & reads device info):"; color: Theme.color.mediumorange4; font.family: "Share Tech Mono"; font.pixelSize: 11 }
+                Text { text: "devices (click one → connects it as your ACTIVE device over BLE — device card, screen & LOTEI, all wireless):"; color: Theme.color.mediumorange4; font.family: "Share Tech Mono"; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.WordWrap }
                 Flow {
                     Layout.fillWidth: true; spacing: 6
                     Repeater {
@@ -664,7 +664,7 @@ Item {
                             border.width: 1; border.color: Theme.color.mediumorange2
                             color: dMouse.containsMouse ? Theme.color.mediumorange2 : "transparent"
                             Text { id: dtxt; anchors.centerIn: parent; text: modelData.name; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 11 }
-                            MouseArea { id: dMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Ble.connectSession(index) }
+                            MouseArea { id: dMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { Ble.connectDevice(index); bleOverlay.open = false } }
                         }
                     }
                 }

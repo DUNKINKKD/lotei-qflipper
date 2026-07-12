@@ -7,6 +7,9 @@
 
 #include "bletransport.h"
 #include "abstractoperation.h"
+#include "deviceregistry.h"
+#include "flipperzero/deviceinfo.h"
+#include "flipperzero/flippertransport.h"
 #include "flipperzero/protobufsession.h"
 #include "flipperzero/rpc/systemdeviceinfooperation.h"
 
@@ -296,4 +299,41 @@ void BleSpike::disconnectSession()
         m_rpc = nullptr;
     }
     setSessionActive(false);
+}
+
+// ---- Phase 3: the chosen Flipper becomes the app's ACTIVE device over BLE ----
+
+void BleSpike::connectDevice(int index)
+{
+    if (index < 0 || index >= m_found.size()) { return; }
+    if (!m_reg) { log(QStringLiteral("[main] device registry unavailable.")); return; }
+
+    // One BLE central link at a time -- drop any in-panel proof/spike link first.
+    disconnectDevice();
+    disconnectSession();
+
+    const QBluetoothDeviceInfo info = m_found.at(index);
+    const QString name = info.name().isEmpty() ? QStringLiteral("Flipper (BLE)") : info.name();
+
+    m_status.clear();
+    log(QStringLiteral("[main] connecting %1 over BLE as the ACTIVE device…").arg(name));
+    log(QStringLiteral("[main] bootstrapping device info + opening session — watch the main window."));
+
+    // The factory the whole backend uses to build a wireless transport. Runs
+    // once for the bootstrap session and once for the live device session.
+    Flipper::Zero::TransportFactory factory = [info](QObject *parent) -> Flipper::Zero::FlipperTransport* {
+        return new BleTransport(info, parent);
+    };
+
+    m_reg->connectBleDevice(name, factory);
+    setSessionActive(true);
+}
+
+void BleSpike::disconnectAll()
+{
+    if (m_reg) { m_reg->removeBleDevice(); }
+    disconnectSession();
+    disconnectDevice();
+    setSessionActive(false);
+    log(QStringLiteral("[main] BLE disconnected."));
 }

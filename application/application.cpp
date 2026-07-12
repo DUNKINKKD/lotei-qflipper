@@ -126,6 +126,11 @@ void Application::initConnections()
 
     m_lotei.setAppBackend(&m_backend);
 
+#ifdef HZUI_BLE
+    // Let the BLE panel register a wireless Flipper as the app's active device.
+    m_ble.setDeviceRegistry(m_backend.deviceRegistry());
+#endif
+
     // Shut LOTEI's brain (Ollama) down when qFlipper really quits, so it never
     // lingers, piles up duplicate servers, or hogs RAM. Only the primary
     // instance reaches here (a second launch exits early via isRunning()).

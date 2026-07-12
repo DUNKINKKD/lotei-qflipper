@@ -11,7 +11,7 @@
 #include <QLowEnergyService>
 #include <QLowEnergyCharacteristic>
 
-namespace Flipper { namespace Zero { class ProtobufSession; } }
+namespace Flipper { class DeviceRegistry; namespace Zero { class ProtobufSession; } }
 
 // BLE test panel backing object, exposed to QML as the singleton `Ble`.
 //
@@ -33,6 +33,9 @@ public:
     explicit BleSpike(QObject *parent = nullptr);
     ~BleSpike() override;
 
+    // The real device registry, so a BLE Flipper can become the active device.
+    void setDeviceRegistry(Flipper::DeviceRegistry *registry) { m_reg = registry; }
+
     QString status() const { return m_status; }
     QVariantList devices() const;
     bool scanning() const { return m_scanning; }
@@ -47,6 +50,12 @@ public:
     // Phase 2: open a real ProtobufSession over BleTransport and read device info.
     Q_INVOKABLE void connectSession(int index);
     Q_INVOKABLE void disconnectSession();
+
+    // Phase 3: register the chosen Flipper as the app's ACTIVE device over BLE
+    // (device card, screen mirror, LOTEI tools -- all wireless). disconnectAll
+    // tears down whatever BLE link is up (registered device, proof session, spike).
+    Q_INVOKABLE void connectDevice(int index);
+    Q_INVOKABLE void disconnectAll();
 
 signals:
     void statusChanged();
@@ -78,6 +87,9 @@ private:
     QLowEnergyCharacteristic        m_rx;   // write endpoint (cached once discovered)
     // Phase-2 real session (owns its BleTransport as a child).
     Flipper::Zero::ProtobufSession *m_rpc = nullptr;
+
+    // Phase-3 registry (not owned) -- BLE Flipper as the app's active device.
+    Flipper::DeviceRegistry *m_reg = nullptr;
 
     QString m_status;
     bool    m_scanning = false;

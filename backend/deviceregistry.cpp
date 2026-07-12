@@ -117,6 +117,42 @@ void DeviceRegistry::removeDevice(const USBDeviceInfo &info)
     }
 }
 
+void DeviceRegistry::connectBleDevice(const QString &name, const Flipper::Zero::TransportFactory &factory)
+{
+    if(!factory) {
+        return;
+    }
+
+    setQueryInProgress(true);
+    qCDebug(LOG_DEVREG).noquote() << "Connecting BLE device:" << name;
+
+    // Reuse the VCP bootstrap, but over the injected BLE transport instead of a
+    // serial port. It fills DeviceInfo (name/fw/hw/storage/...) exactly as USB,
+    // then processDevice() registers a FlipperZero that carries the same factory.
+    auto *fetcher = new Zero::VCPDeviceInfoHelper(USBDeviceInfo(), this);
+    fetcher->setBleTransport(name, factory);
+    connect(fetcher, &Zero::AbstractDeviceInfoHelper::finished, this, &DeviceRegistry::processDevice);
+    connect(fetcher, &Zero::AbstractDeviceInfoHelper::finished, fetcher, &QObject::deleteLater);
+}
+
+void DeviceRegistry::removeBleDevice()
+{
+    const auto it = std::find_if(m_devices.begin(), m_devices.end(), [](Flipper::FlipperZero *dev) {
+        return dev->deviceState()->deviceInfo().isBle;
+    });
+
+    if(it == m_devices.end()) {
+        return;
+    }
+
+    const auto idx = std::distance(m_devices.begin(), it);
+    qCDebug(LOG_DEVREG).noquote() << "BLE device disconnected:" << (*it)->deviceState()->name();
+
+    m_devices.takeAt(idx)->deleteLater();
+    emit deviceCountChanged();
+    emit currentDeviceChanged();
+}
+
 void DeviceRegistry::removeOfflineDevices()
 {
     auto it = std::remove_if(m_devices.begin(), m_devices.end(), [](Flipper::FlipperZero *arg) {
