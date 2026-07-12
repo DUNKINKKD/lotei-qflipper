@@ -14,6 +14,7 @@ namespace Flipper {
 namespace Zero {
 
 class AbstractProtobufOperation;
+class FlipperTransport;
 
 class SystemRebootOperation;
 class SystemDeviceInfoOperation;
@@ -143,7 +144,7 @@ private:
 
     SessionState m_sessionState;
     QSerialPortInfo m_portInfo;
-    QSerialPort *m_serialPort;
+    FlipperTransport *m_transport;
     QByteArray m_receivedData;
 
 #if !defined(QT_STATIC)
