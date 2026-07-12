@@ -11,11 +11,15 @@
 #include <QLowEnergyService>
 #include <QLowEnergyCharacteristic>
 
-// Phase-1 BLE spike: scan for the Flipper Zero, connect, find its Serial GATT
-// service, subscribe to the TX characteristic, and prove a raw byte pipe works
-// (on connect the Flipper streams its CLI banner over TX -- receiving that = win).
-// This is a throwaway proof-of-transport; the real thing gets abstracted into
-// ProtobufSession later. Exposed to QML as the singleton `Ble`.
+namespace Flipper { namespace Zero { class ProtobufSession; } }
+
+// BLE test panel backing object, exposed to QML as the singleton `Ble`.
+//
+//   Phase 1 (spike):  scan / connectToDevice / ping -- a raw byte pipe straight to
+//                     the Flipper's Serial GATT, proving the transport works.
+//   Phase 2 (real):   connectSession -- opens an actual ProtobufSession running over
+//                     a BleTransport and reads device info through the normal RPC
+//                     pipeline, proving the whole app-level stack works wirelessly.
 class BleSpike : public QObject
 {
     Q_OBJECT
@@ -23,6 +27,7 @@ class BleSpike : public QObject
     Q_PROPERTY(QVariantList devices READ devices NOTIFY devicesChanged) // [{name,address}]
     Q_PROPERTY(bool scanning READ scanning NOTIFY scanningChanged)
     Q_PROPERTY(bool connected READ connected NOTIFY connectedChanged)
+    Q_PROPERTY(bool sessionActive READ sessionActive NOTIFY sessionActiveChanged)
 
 public:
     explicit BleSpike(QObject *parent = nullptr);
@@ -32,22 +37,29 @@ public:
     QVariantList devices() const;
     bool scanning() const { return m_scanning; }
     bool connected() const { return m_connected; }
+    bool sessionActive() const { return m_sessionActive; }
 
     Q_INVOKABLE void scan();              // start LE discovery (~8s)
     Q_INVOKABLE void connectToDevice(int index);
     Q_INVOKABLE void ping();              // poke the CLI (send "\r\n") to prove the RX write path
     Q_INVOKABLE void disconnectDevice();
 
+    // Phase 2: open a real ProtobufSession over BleTransport and read device info.
+    Q_INVOKABLE void connectSession(int index);
+    Q_INVOKABLE void disconnectSession();
+
 signals:
     void statusChanged();
     void devicesChanged();
     void scanningChanged();
     void connectedChanged();
+    void sessionActiveChanged();
 
 private:
     void log(const QString &line);
     void setScanning(bool v);
     void setConnected(bool v);
+    void setSessionActive(bool v);
     void onDeviceDiscovered(const QBluetoothDeviceInfo &info);
     void onServiceStateChanged(QLowEnergyService::ServiceState s);
     void onCharacteristicChanged(const QLowEnergyCharacteristic &c, const QByteArray &value);
@@ -64,7 +76,11 @@ private:
     QLowEnergyController           *m_ctrl = nullptr;
     QLowEnergyService              *m_serial = nullptr;
     QLowEnergyCharacteristic        m_rx;   // write endpoint (cached once discovered)
+    // Phase-2 real session (owns its BleTransport as a child).
+    Flipper::Zero::ProtobufSession *m_rpc = nullptr;
+
     QString m_status;
     bool    m_scanning = false;
     bool    m_connected = false;
+    bool    m_sessionActive = false;
 };

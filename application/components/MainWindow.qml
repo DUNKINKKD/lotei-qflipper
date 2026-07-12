@@ -612,7 +612,7 @@ Item {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    Text { text: "📶  BLE CONNECT (spike)"; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 20; font.bold: true }
+                    Text { text: "📶  BLE CONNECT"; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 20; font.bold: true }
                     Item { Layout.fillWidth: true }
                     Text {
                         text: "✕"; color: closeBleMouse.containsMouse ? Theme.color.lightorange2 : Theme.color.mediumorange4
@@ -638,11 +638,23 @@ Item {
                         Text { anchors.centerIn: parent; text: "PING"; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 12; font.bold: true }
                         MouseArea { id: pingMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Ble.ping() }
                     }
+                    Rectangle {
+                        visible: Ble.sessionActive
+                        Layout.preferredWidth: 110; Layout.preferredHeight: 30; radius: 6
+                        border.width: 1; border.color: Theme.color.mediumorange2
+                        color: disMouse.containsMouse ? Theme.color.mediumorange2 : "transparent"
+                        Text { anchors.centerIn: parent; text: "DISCONNECT"; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 12; font.bold: true }
+                        MouseArea { id: disMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Ble.disconnectSession() }
+                    }
                     Item { Layout.fillWidth: true }
-                    Text { text: Ble.connected ? "● connected" : "○ not connected"; color: Ble.connected ? Theme.color.lightgreen : Theme.color.mediumorange1; font.family: "Share Tech Mono"; font.pixelSize: 12 }
+                    Text {
+                        text: Ble.sessionActive ? "● RPC session live" : (Ble.connected ? "● spike link" : "○ not connected")
+                        color: Ble.sessionActive ? Theme.color.lightgreen : (Ble.connected ? Theme.color.lightorange2 : Theme.color.mediumorange1)
+                        font.family: "Share Tech Mono"; font.pixelSize: 12
+                    }
                 }
 
-                Text { text: "devices (click one to connect):"; color: Theme.color.mediumorange4; font.family: "Share Tech Mono"; font.pixelSize: 11 }
+                Text { text: "devices (click one → opens a real RPC session over BLE & reads device info):"; color: Theme.color.mediumorange4; font.family: "Share Tech Mono"; font.pixelSize: 11 }
                 Flow {
                     Layout.fillWidth: true; spacing: 6
                     Repeater {
@@ -652,7 +664,7 @@ Item {
                             border.width: 1; border.color: Theme.color.mediumorange2
                             color: dMouse.containsMouse ? Theme.color.mediumorange2 : "transparent"
                             Text { id: dtxt; anchors.centerIn: parent; text: modelData.name; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 11 }
-                            MouseArea { id: dMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Ble.connectToDevice(index) }
+                            MouseArea { id: dMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Ble.connectSession(index) }
                         }
                     }
                 }

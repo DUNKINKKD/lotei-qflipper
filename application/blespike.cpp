@@ -3,6 +3,12 @@
 #include <QVariantMap>
 #include <QLowEnergyDescriptor>
 #include <QBluetoothAddress>
+#include <QSerialPortInfo>
+
+#include "bletransport.h"
+#include "abstractoperation.h"
+#include "flipperzero/protobufsession.h"
+#include "flipperzero/rpc/systemdeviceinfooperation.h"
 
 // Flipper Serial GATT service + characteristics (from flipperzero-firmware
 // targets/f7/ble_glue/services/serial_service_uuid.inc, decoded to standard form).
@@ -48,6 +54,7 @@ void BleSpike::log(const QString &line)
 
 void BleSpike::setScanning(bool v)  { if (v != m_scanning)  { m_scanning = v;  emit scanningChanged(); } }
 void BleSpike::setConnected(bool v) { if (v != m_connected) { m_connected = v; emit connectedChanged(); } }
+void BleSpike::setSessionActive(bool v) { if (v != m_sessionActive) { m_sessionActive = v; emit sessionActiveChanged(); } }
 
 QVariantList BleSpike::devices() const
 {
@@ -224,4 +231,69 @@ void BleSpike::disconnectDevice()
     if (m_serial) { m_serial->deleteLater(); m_serial = nullptr; }
     if (m_ctrl) { m_ctrl->disconnectFromDevice(); m_ctrl->deleteLater(); m_ctrl = nullptr; }
     setConnected(false);
+}
+
+// ---- Phase 2: the real thing -- a ProtobufSession running over BleTransport ----
+
+void BleSpike::connectSession(int index)
+{
+    using namespace Flipper::Zero;
+
+    if (index < 0 || index >= m_found.size()) { return; }
+
+    // Only one BLE central link to the Flipper at a time -- drop the raw spike
+    // connection (and any prior session) before opening the real one.
+    disconnectDevice();
+    disconnectSession();
+
+    const QBluetoothDeviceInfo info = m_found.at(index);
+    m_status.clear();
+    log(QStringLiteral("[session] opening a REAL RPC session over BLE to %1…").arg(info.name()));
+
+    // No serial port: inject a BleTransport instead. Default protobuf version 0
+    // loads flipperproto0, which speaks SystemDeviceInfoRequest.
+    m_rpc = new ProtobufSession(QSerialPortInfo(), this);
+    m_rpc->setTransport(new BleTransport(info, m_rpc));
+
+    connect(m_rpc, &ProtobufSession::sessionStateChanged, this, [this]() {
+        if (!m_rpc) { return; }
+        if (m_rpc->isSessionUp()) {
+            setSessionActive(true);
+        } else if (m_rpc->isError()) {
+            log(QStringLiteral("[session] FAILED: ") + m_rpc->errorString());
+            setSessionActive(false);
+        }
+    });
+
+    // Queue the device-info query now; it runs the instant the BLE link is up.
+    auto *op = m_rpc->systemDeviceInfo();
+    connect(op, &AbstractOperation::finished, this, [this, op]() {
+        if (op->isError()) {
+            log(QStringLiteral("[session] device-info error: ") + op->errorString());
+            return;
+        }
+        const auto v = [op](const char *k) {
+            return QString::fromUtf8(op->value(QByteArray(k)));
+        };
+        log(QStringLiteral("[session] ✓ DEVICE INFO — read over Bluetooth:"));
+        log(QStringLiteral("    name:      ") + v("hardware_name"));
+        log(QStringLiteral("    hardware:  ver ") + v("hardware_ver") + QStringLiteral(", target f") + v("hardware_target"));
+        log(QStringLiteral("    firmware:  ") + v("firmware_version") + QStringLiteral(" (") + v("firmware_commit") + QStringLiteral(")"));
+        log(QStringLiteral("    branch:    ") + v("firmware_branch"));
+        log(QStringLiteral("    radio FW:  ") + v("radio_stack_major") + QStringLiteral(".") + v("radio_stack_minor"));
+        log(QStringLiteral("[session] real RPC over Bluetooth confirmed. 🎉"));
+    });
+
+    m_rpc->startSession();
+    log(QStringLiteral("[session] link opening (connect + GATT handshake)…"));
+}
+
+void BleSpike::disconnectSession()
+{
+    if (m_rpc) {
+        m_rpc->stopSession();
+        m_rpc->deleteLater(); // its child BleTransport closes the BLE link in its dtor
+        m_rpc = nullptr;
+    }
+    setSessionActive(false);
 }
