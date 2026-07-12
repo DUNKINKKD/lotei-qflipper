@@ -221,6 +221,31 @@ Item {
             }
         }
 
+        // BLE-connection spike (Phase 1) trigger
+        TextLabel {
+            id: bleButton
+            anchors.top: parent.top
+            anchors.left: portToggle.right
+            anchors.leftMargin: 20
+            anchors.topMargin: 10
+
+            color: Ble.connected ? Theme.color.lightgreen : Theme.color.lightorange2
+            opacity: bleMouse.containsMouse ? 1.0 : 0.5
+
+            font.family: "ProggySquareTT"
+            font.pixelSize: 16
+            text: "BLE"
+
+            MouseArea {
+                id: bleMouse
+                anchors.fill: parent
+                anchors.margins: -6
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: bleOverlay.open = true
+            }
+        }
+
         DeviceWidget {
             id: deviceWidget
             opacity: Backend.backendState !== ApplicationBackend.ScreenStreaming &&
@@ -558,6 +583,102 @@ Item {
                             Layout.preferredWidth: 60
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // ---- BLE connection spike (Phase 1): scan / connect / prove a byte pipe ----
+    Item {
+        id: bleOverlay
+        property bool open: false
+        anchors.fill: parent
+        visible: open
+        z: 9995
+
+        Rectangle {
+            anchors.fill: parent; color: "#000000"; opacity: 0.72
+            MouseArea { anchors.fill: parent; onClicked: bleOverlay.open = false }
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 580; height: 490
+            color: "#0b0410"; radius: 12; border.width: 2; border.color: Theme.color.mediumorange2
+            MouseArea { anchors.fill: parent }
+
+            ColumnLayout {
+                anchors.fill: parent; anchors.margins: 20; spacing: 12
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text { text: "📶  BLE CONNECT (spike)"; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 20; font.bold: true }
+                    Item { Layout.fillWidth: true }
+                    Text {
+                        text: "✕"; color: closeBleMouse.containsMouse ? Theme.color.lightorange2 : Theme.color.mediumorange4
+                        font.family: "Share Tech Mono"; font.pixelSize: 18
+                        MouseArea { id: closeBleMouse; anchors.fill: parent; anchors.margins: -6; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: bleOverlay.open = false }
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 10
+                    Rectangle {
+                        Layout.preferredWidth: 110; Layout.preferredHeight: 30; radius: 6
+                        border.width: 1; border.color: Theme.color.mediumorange2
+                        color: scanMouse.containsMouse && !Ble.scanning ? Theme.color.mediumorange2 : "transparent"
+                        Text { anchors.centerIn: parent; text: Ble.scanning ? "SCANNING…" : "SCAN"; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 12; font.bold: true }
+                        MouseArea { id: scanMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: if (!Ble.scanning) Ble.scan() }
+                    }
+                    Rectangle {
+                        visible: Ble.connected
+                        Layout.preferredWidth: 70; Layout.preferredHeight: 30; radius: 6
+                        border.width: 1; border.color: Theme.color.mediumorange2
+                        color: pingMouse.containsMouse ? Theme.color.mediumorange2 : "transparent"
+                        Text { anchors.centerIn: parent; text: "PING"; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 12; font.bold: true }
+                        MouseArea { id: pingMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Ble.ping() }
+                    }
+                    Item { Layout.fillWidth: true }
+                    Text { text: Ble.connected ? "● connected" : "○ not connected"; color: Ble.connected ? Theme.color.lightgreen : Theme.color.mediumorange1; font.family: "Share Tech Mono"; font.pixelSize: 12 }
+                }
+
+                Text { text: "devices (click one to connect):"; color: Theme.color.mediumorange4; font.family: "Share Tech Mono"; font.pixelSize: 11 }
+                Flow {
+                    Layout.fillWidth: true; spacing: 6
+                    Repeater {
+                        model: Ble.devices
+                        delegate: Rectangle {
+                            radius: 5; height: 26; width: dtxt.width + 18
+                            border.width: 1; border.color: Theme.color.mediumorange2
+                            color: dMouse.containsMouse ? Theme.color.mediumorange2 : "transparent"
+                            Text { id: dtxt; anchors.centerIn: parent; text: modelData.name; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 11 }
+                            MouseArea { id: dMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Ble.connectToDevice(index) }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true; Layout.fillHeight: true
+                    color: "#160a1c"; radius: 6; border.width: 1; border.color: Theme.color.mediumorange1
+                    Flickable {
+                        id: logFlick
+                        anchors.fill: parent; anchors.margins: 8; clip: true
+                        contentHeight: logText.height; contentWidth: width
+                        Text {
+                            id: logText
+                            width: logFlick.width
+                            text: Ble.status
+                            color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 11
+                            wrapMode: Text.WrapAnywhere
+                            onTextChanged: logFlick.contentY = Math.max(0, logText.height - logFlick.height)
+                        }
+                    }
+                }
+
+                Text {
+                    Layout.fillWidth: true; wrapMode: Text.WordWrap
+                    text: "⚠ if connect fails: pair the Flipper in Windows Bluetooth settings first (enter the PIN it shows), then SCAN again."
+                    color: Theme.color.mediumorange1; font.family: "Share Tech Mono"; font.pixelSize: 10
                 }
             }
         }

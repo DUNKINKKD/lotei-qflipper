@@ -9,6 +9,13 @@ win32 {
     QT += texttospeech multimedia
     DEFINES += HZUI_VOICE
     RESOURCES += music.qrc
+
+    # BLE-connection spike (Phase 1) -- Windows-only for now so the Linux build
+    # doesn't need qtconnectivity yet. Gated behind HZUI_BLE.
+    QT += bluetooth
+    DEFINES += HZUI_BLE
+    SOURCES += blespike.cpp
+    HEADERS += blespike.h
 }
 
 include(../qflipper_common.pri)
