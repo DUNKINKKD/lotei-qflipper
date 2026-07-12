@@ -26,9 +26,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Qt 6.4.2 (dynamic) via aqtinstall. Base gcc_64 install covers qtbase +
 # qtdeclarative (Quick/Controls2) + qtsvg; the rest are explicit modules.
+# qtconnectivity = QtBluetooth (BLE); on Linux its backend talks to BlueZ over
+# D-Bus (libdbus-1-dev above), and libQt6DBus is pulled in + bundled with it.
 RUN pip3 install --no-cache-dir aqtinstall
 RUN aqt install-qt linux desktop 6.4.2 gcc_64 \
-        -m qtserialport qt5compat qtimageformats \
+        -m qtserialport qt5compat qtimageformats qtconnectivity \
         -O /opt/qt
 ENV QTDIR="/opt/qt/6.4.2/gcc_64"
 ENV PATH="/opt/qt/6.4.2/gcc_64/bin:${PATH}"

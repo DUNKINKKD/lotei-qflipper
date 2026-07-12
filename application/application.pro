@@ -6,14 +6,19 @@ QT += quick serialport widgets quickcontrols2 svg network
 # resource (see loteibackend.* and MainWindow.qml). Linux still gets everything
 # else (chat, colors, firmware manager, screen mirror, ...).
 win32 {
+    # Voice (Piper/SAPI) + music player: QtMultimedia / QtTextToSpeech are hard
+    # to bundle in the Linux AppImage, so audio stays Windows-only (HZUI_VOICE).
     QT += texttospeech multimedia
     DEFINES += HZUI_VOICE
     RESOURCES += music.qrc
+}
 
-    # BLE connection -- Windows-only for now so the Linux build doesn't need
-    # qtconnectivity yet. Gated behind HZUI_BLE.
-    #   blespike     -- Phase 1 proof-of-transport (kept for the BLE test panel)
-    #   bletransport -- Phase 2 FlipperTransport impl the real session runs over
+# BLE connection -- Windows + Linux. Qt Bluetooth uses the WinRT backend on
+# Windows and the BlueZ/D-Bus backend on Linux (the Linux CI Qt now includes
+# qtconnectivity; see docker/Dockerfile). Gated behind HZUI_BLE.
+#   blespike     -- scan/connect test panel (Phase 1 proof + Phase 3 device connect)
+#   bletransport -- the FlipperTransport impl the real session runs over
+win32|linux {
     QT += bluetooth
     DEFINES += HZUI_BLE
     SOURCES += blespike.cpp bletransport.cpp
