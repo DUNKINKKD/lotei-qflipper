@@ -6,6 +6,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+  # Auto-build the AppImage on pushes to ble-spike while features are in flight
+  # (CLI, firmware additions, ...) so we can grab the artifact and test on Linux.
+  # Drop this again before cutting the next release.
+  push:
+    branches: [ble-spike]
 
 permissions:
   contents: write
