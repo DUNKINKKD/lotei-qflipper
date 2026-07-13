@@ -728,7 +728,7 @@ Item {
         Rectangle {
             anchors.centerIn: parent
             width: 560
-            height: 470
+            height: 488
             color: "#0b0410"; radius: 12
             border.width: 2; border.color: Theme.color.mediumorange2
             MouseArea { anchors.fill: parent }   // swallow backdrop clicks over the panel
@@ -755,13 +755,14 @@ Item {
                           : "Connect your Flipper to flash. Latest builds are shown below."
                 }
 
-                ColumnLayout {
-                    Layout.fillWidth: true; Layout.fillHeight: true; spacing: 8
-                    Repeater {
-                        model: Firmware.sources
-                        delegate: Rectangle {
-                            Layout.fillWidth: true
-                            implicitHeight: 60
+                ListView {
+                    Layout.fillWidth: true; Layout.fillHeight: true
+                    spacing: 8; clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    model: Firmware.sources
+                    delegate: Rectangle {
+                            width: ListView.view.width
+                            height: 54
                             radius: 8; color: "#160a1c"
                             border.width: 1; border.color: Theme.color.mediumorange2
 
@@ -826,8 +827,6 @@ Item {
                                 }
                             }
                         }
-                    }
-                    Item { Layout.fillHeight: true }
                 }
 
                 Text {

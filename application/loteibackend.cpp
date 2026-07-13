@@ -1185,6 +1185,16 @@ FirmwareStore::FirmwareStore(QObject *parent)
         { QStringLiteral("RogueMaster"), Kind::GitHub,
           QStringLiteral("RogueMaster/flipperzero-firmware-wPlugins"),
           QStringLiteral("Everything, plus the kitchen sink."),   git, rel, {}, {}, {}, {} },
+        // ARF ships only dev-tagged releases, so give it a single "dev" channel.
+        { QStringLiteral("ARF"),         Kind::GitHub,
+          QStringLiteral("D4C1-Labs/Flipper-ARF"),
+          QStringLiteral("Automotive research: car keyfobs / Sub-GHz. Niche."),
+          { QStringLiteral("dev") }, QStringLiteral("dev"), {}, {}, {}, {} },
+        // Xero publishes versioned releases (flipper-z-f7-update-local.tgz).
+        { QStringLiteral("Xero"),        Kind::GitHub,
+          QStringLiteral("noproto/xero-firmware"),
+          QStringLiteral("Lean official-based community firmware."),
+          { QStringLiteral("release") }, QStringLiteral("release"), {}, {}, {}, {} },
     };
 
     // Restore each firmware's remembered channel choice.
