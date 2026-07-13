@@ -2,6 +2,12 @@
 
 set -euxo pipefail
 
+# git 2.35+ refuses to run in a repo owned by a different user, and in the build
+# container /project is owned by the host/runner while we run as root. That made
+# `git describe` in qflipper_common.pri fail, so APP_VERSION baked as "unknown".
+# Mark the tree safe so the version/commit are picked up correctly.
+git config --global --add safe.directory '*' || true
+
 TARGET="qFlipper"
 BUILDDIR="build"
 APPDIR="$PWD/$BUILDDIR/AppDir"
