@@ -6,6 +6,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+  # While BLE is in bring-up on ble-spike, build the AppImage on every push to
+  # that branch so we can download the artifact and test Bluetooth on real Linux
+  # hardware. Remove this trigger once BLE lands (dispatch/release cover it).
+  push:
+    branches: [ble-spike]
 
 permissions:
   contents: write
