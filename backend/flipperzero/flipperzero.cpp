@@ -239,9 +239,11 @@ void FlipperZero::onDeviceInfoChanged()
     if(deviceInfo.transportFactory) {
         // Wireless: run the session over a freshly-built transport (e.g. BLE).
         m_rpc->setTransport(deviceInfo.transportFactory(m_rpc));
-        // The bootstrap helper just disconnected its own BLE link; give the
-        // radio a moment before the device session re-connects to the same peer.
-        startDelay = 700;
+        // The bootstrap helper just disconnected its own BLE link. On Linux/BlueZ
+        // the ACL teardown is slow, and reconnecting to the same peer before it
+        // completes races a half-open link ("Not Connected" on the first
+        // descriptor write). Wait long enough for a clean disconnect first.
+        startDelay = 3000;
     } else {
         m_rpc->setSerialPort(pi);
     }

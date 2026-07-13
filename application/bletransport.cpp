@@ -1,5 +1,7 @@
 #include "bletransport.h"
 
+#include <QTimer>
+
 // Flipper Serial GATT service + characteristics (from flipperzero-firmware
 // targets/f7/ble_glue/services/serial_service_uuid.inc). Identical to the spike.
 const QBluetoothUuid BleTransport::kSerialService =
@@ -277,8 +279,24 @@ void BleTransport::close()
         m_serial = nullptr;
     }
     if(m_ctrl) {
-        m_ctrl->disconnectFromDevice();
-        m_ctrl->deleteLater();
+        QLowEnergyController *ctrl = m_ctrl;
         m_ctrl = nullptr;
+
+        // Detach the controller from this transport so it survives our own
+        // deleteLater() (ProtobufSession frees the transport right after close()).
+        // Otherwise it'd be destroyed as our child mid-disconnect.
+        ctrl->setParent(nullptr);
+
+        if(ctrl->state() == QLowEnergyController::UnconnectedState) {
+            ctrl->deleteLater();
+        } else {
+            // Tear the link down cleanly and only free the controller once the
+            // disconnect has actually completed. Deleting it while still
+            // connected leaves the BlueZ ACL up on Linux, so the next connect to
+            // the same peer races a half-open link and fails ("Not Connected").
+            connect(ctrl, &QLowEnergyController::disconnected, ctrl, &QObject::deleteLater);
+            QTimer::singleShot(4000, ctrl, &QObject::deleteLater); // safety net
+            ctrl->disconnectFromDevice();
+        }
     }
 }

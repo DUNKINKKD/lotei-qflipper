@@ -264,11 +264,14 @@ void ProtobufSession::startSession()
     // and let opened()/openFailed() drive the session live, rather than opening a
     // USB serial port from m_portInfo.
     if(m_transport) {
-        connect(m_transport, &FlipperTransport::opened, this, &ProtobufSession::onTransportReady, Qt::UniqueConnection);
+        // A fresh transport is built per session, so plain (non-unique) connects
+        // are correct here -- and Qt::UniqueConnection is illegal with a lambda
+        // slot anyway (it silently drops the connection).
+        connect(m_transport, &FlipperTransport::opened, this, &ProtobufSession::onTransportReady);
         connect(m_transport, &FlipperTransport::openFailed, this, [=](const QString &err) {
             qCCritical(LOG_SESSION).noquote() << "Failed to start RPC session:" << err;
             stopEarly(BackendError::SerialError, err);
-        }, Qt::UniqueConnection);
+        });
 
         if(!m_transport->open()) {
             qCCritical(LOG_SESSION).noquote() << "Failed to start RPC session:" << m_transport->errorString();
