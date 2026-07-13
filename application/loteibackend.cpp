@@ -19,11 +19,16 @@
 #include <QAudioOutput>
 #endif
 
+#include <QSerialPort>
+#include <QTimer>
+
 #include "applicationbackend.h"
+#include "deviceregistry.h"
 #include "abstractoperation.h"
 #include "fileinfo.h"
 #include "inputevent.h"
 #include "flipperzero/flipperzero.h"
+#include "flipperzero/devicestate.h"
 #include "flipperzero/protobufsession.h"
 #include "flipperzero/rpc/storagelistoperation.h"
 #include "flipperzero/rpc/storagereadoperation.h"
@@ -1435,4 +1440,135 @@ void FirmwareStore::install(int index)
         emit progress(index, 1.0, QStringLiteral("Ready -- flashing…"));
         emit readyToInstall(QUrl::fromLocalFile(outPath).toString());
     });
+}
+
+// ===================== FlipperCli: in-app Flipper text CLI =====================
+
+FlipperCli::FlipperCli(QObject *parent)
+    : QObject(parent)
+{
+}
+
+void FlipperCli::setOpen(bool value)
+{
+    if (m_open == value) { return; }
+    m_open = value;
+    emit openChanged();
+
+    if (m_open) { connectCli(); }
+    else        { disconnectCli(); }
+}
+
+void FlipperCli::connectCli()
+{
+    clearOutput();
+
+    if (!m_appBackend) { setStatus(QStringLiteral("Backend unavailable.")); return; }
+
+    auto *reg = m_appBackend->deviceRegistry();
+    auto *dev = reg ? reg->currentDevice() : nullptr;
+    if (!dev) {
+        setStatus(QStringLiteral("Connect a Flipper over USB first."));
+        return;
+    }
+
+    const auto &info = dev->deviceState()->deviceInfo();
+    if (info.isBle || info.portInfo.isNull()) {
+        setStatus(QStringLiteral("CLI is USB-only for now (this device is wireless)."));
+        return;
+    }
+    const QSerialPortInfo portInfo = info.portInfo;
+
+    // Hand the serial line off from RPC to us: releasePort() stops the RPC
+    // session, which closes the COM port and drops the Flipper back to its CLI.
+    setStatus(QStringLiteral("Pausing qFlipper's session and opening the CLI…"));
+    appendOutput(QStringLiteral("[ pausing the device session -- the card & screen mirror return when you close the CLI ]\n\n"));
+    m_appBackend->releasePort();
+
+    // Give the RPC teardown a moment to actually free the port, then take it over.
+    QTimer::singleShot(700, this, [this, portInfo]() {
+        if (!m_open) { return; }   // user closed the CLI again before we got here
+
+        m_port = new QSerialPort(portInfo, this);
+        m_port->setBaudRate(230400);
+        m_port->setDataBits(QSerialPort::Data8);
+        m_port->setParity(QSerialPort::NoParity);
+        m_port->setStopBits(QSerialPort::OneStop);
+        m_port->setFlowControl(QSerialPort::NoFlowControl);
+
+        if (!m_port->open(QIODevice::ReadWrite)) {
+            appendOutput(QStringLiteral("[ couldn't open %1: %2 ]\n").arg(portInfo.portName(), m_port->errorString()));
+            setStatus(QStringLiteral("Couldn't open the port -- close and retry."));
+            m_port->deleteLater();
+            m_port = nullptr;
+            return;
+        }
+
+        connect(m_port, &QSerialPort::readyRead, this, &FlipperCli::onReadyRead);
+        setActive(true);
+        setStatus(QStringLiteral("CLI live -- type a command (try 'help')."));
+        m_port->write("\r\n");   // nudge a fresh prompt
+    });
+}
+
+void FlipperCli::disconnectCli()
+{
+    if (m_port) {
+        m_port->close();
+        m_port->deleteLater();
+        m_port = nullptr;
+    }
+    setActive(false);
+    setStatus(QString());
+
+    // Hand the line back to qFlipper's normal RPC session.
+    if (m_appBackend) { m_appBackend->reacquirePort(); }
+}
+
+void FlipperCli::send(const QString &cmd)
+{
+    if (!m_port || !m_active) { return; }
+    m_port->write(cmd.toUtf8());
+    m_port->write("\r\n");
+}
+
+void FlipperCli::interrupt()
+{
+    if (!m_port || !m_active) { return; }
+    m_port->write("\x03");   // Ctrl-C
+}
+
+void FlipperCli::onReadyRead()
+{
+    if (!m_port) { return; }
+    QString text = QString::fromUtf8(m_port->readAll());
+    // Strip ANSI escape sequences (colours, cursor moves) for a clean text view.
+    static const QRegularExpression ansi(QStringLiteral("\x1B\\[[0-9;?]*[A-Za-z]"));
+    text.remove(ansi);
+    text.remove(QLatin1Char('\r'));
+    appendOutput(text);
+}
+
+void FlipperCli::clearOutput()
+{
+    if (m_output.isEmpty()) { return; }
+    m_output.clear();
+    emit outputChanged();
+}
+
+void FlipperCli::appendOutput(const QString &text)
+{
+    m_output += text;
+    if (m_output.size() > 20000) { m_output = m_output.right(16000); }
+    emit outputChanged();
+}
+
+void FlipperCli::setActive(bool v)
+{
+    if (m_active != v) { m_active = v; emit activeChanged(); }
+}
+
+void FlipperCli::setStatus(const QString &s)
+{
+    if (m_status != s) { m_status = s; emit statusChanged(); }
 }

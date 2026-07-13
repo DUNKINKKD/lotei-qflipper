@@ -79,6 +79,7 @@ private:
     LoteiBackend m_lotei;
     LoteiPalette m_palette;
     FirmwareStore m_firmware;
+    FlipperCli m_cli;
 #ifdef HZUI_BLE
     BleSpike m_ble;
 #endif

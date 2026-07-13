@@ -246,6 +246,31 @@ Item {
             }
         }
 
+        // In-app Flipper CLI terminal trigger
+        TextLabel {
+            id: cliButton
+            anchors.top: parent.top
+            anchors.left: bleButton.right
+            anchors.leftMargin: 20
+            anchors.topMargin: 10
+
+            color: Cli.active ? Theme.color.lightgreen : Theme.color.lightorange2
+            opacity: (cliMouse.containsMouse || Cli.active) ? 1.0 : 0.5
+
+            font.family: "ProggySquareTT"
+            font.pixelSize: 16
+            text: Cli.active ? "CLI ●" : "CLI"
+
+            MouseArea {
+                id: cliMouse
+                anchors.fill: parent
+                anchors.margins: -6
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: Cli.open = true
+            }
+        }
+
         DeviceWidget {
             id: deviceWidget
             opacity: Backend.backendState !== ApplicationBackend.ScreenStreaming &&
@@ -691,6 +716,103 @@ Item {
                     Layout.fillWidth: true; wrapMode: Text.WordWrap
                     text: "⚠ if connect fails: pair the Flipper in Windows Bluetooth settings first (enter the PIN it shows), then SCAN again."
                     color: Theme.color.mediumorange1; font.family: "Share Tech Mono"; font.pixelSize: 10
+                }
+            }
+        }
+    }
+
+    // ---- in-app Flipper CLI terminal (pauses RPC while open; USB only) ----
+    Item {
+        id: cliOverlay
+        anchors.fill: parent
+        visible: Cli.open
+        z: 9996
+
+        Rectangle {
+            anchors.fill: parent; color: "#000000"; opacity: 0.72
+            MouseArea { anchors.fill: parent; onClicked: Cli.open = false }
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 640; height: 470
+            color: "#0b0410"; radius: 12; border.width: 2; border.color: Theme.color.mediumorange2
+            MouseArea { anchors.fill: parent }
+
+            ColumnLayout {
+                anchors.fill: parent; anchors.margins: 18; spacing: 10
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text { text: "⌨  FLIPPER CLI"; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 20; font.bold: true }
+                    Item { Layout.fillWidth: true }
+                    Text {
+                        text: "✕"; color: closeCliMouse.containsMouse ? Theme.color.lightorange2 : Theme.color.mediumorange4
+                        font.family: "Share Tech Mono"; font.pixelSize: 18
+                        MouseArea { id: closeCliMouse; anchors.fill: parent; anchors.margins: -6; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Cli.open = false }
+                    }
+                }
+
+                Text {
+                    Layout.fillWidth: true; wrapMode: Text.WordWrap
+                    text: Cli.status.length > 0 ? Cli.status
+                        : "Flipper text CLI over USB. qFlipper's session pauses while this is open, and resumes when you close it."
+                    color: Cli.active ? Theme.color.lightgreen : Theme.color.mediumorange4
+                    font.family: "Share Tech Mono"; font.pixelSize: 11
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true; Layout.fillHeight: true
+                    color: "#160a1c"; radius: 6; border.width: 1; border.color: Theme.color.mediumorange1
+                    Flickable {
+                        id: cliFlick
+                        anchors.fill: parent; anchors.margins: 8; clip: true
+                        contentHeight: cliText.height; contentWidth: width
+                        Text {
+                            id: cliText
+                            width: cliFlick.width
+                            text: Cli.output
+                            color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 12
+                            wrapMode: Text.WrapAnywhere
+                            onTextChanged: cliFlick.contentY = Math.max(0, cliText.height - cliFlick.height)
+                        }
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 8
+                    Rectangle {
+                        Layout.fillWidth: true; Layout.preferredHeight: 34; radius: 6
+                        color: "#160a1c"; border.width: 1; border.color: Theme.color.mediumorange2
+                        TextInput {
+                            id: cliInput
+                            anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
+                            verticalAlignment: TextInput.AlignVCenter
+                            clip: true; enabled: Cli.active
+                            color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 13
+                            onAccepted: { if (text.length > 0) { Cli.send(text); text = ""; } }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: cliInput.text.length === 0
+                                text: Cli.active ? "type a command + Enter (try 'help')…" : "connect a Flipper over USB"
+                                color: Theme.color.mediumorange1; font.family: "Share Tech Mono"; font.pixelSize: 13
+                            }
+                        }
+                    }
+                    Rectangle {
+                        Layout.preferredWidth: 64; Layout.preferredHeight: 34; radius: 6
+                        border.width: 1; border.color: Theme.color.mediumorange2
+                        color: sendCliMouse.containsMouse ? Theme.color.mediumorange2 : "transparent"
+                        Text { anchors.centerIn: parent; text: "SEND"; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 12; font.bold: true }
+                        MouseArea { id: sendCliMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { if (cliInput.text.length > 0) { Cli.send(cliInput.text); cliInput.text = ""; } } }
+                    }
+                    Rectangle {
+                        Layout.preferredWidth: 42; Layout.preferredHeight: 34; radius: 6
+                        border.width: 1; border.color: Theme.color.mediumorange2
+                        color: ctrlcMouse.containsMouse ? Theme.color.mediumorange2 : "transparent"
+                        Text { anchors.centerIn: parent; text: "^C"; color: Theme.color.lightorange2; font.family: "Share Tech Mono"; font.pixelSize: 12; font.bold: true }
+                        MouseArea { id: ctrlcMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Cli.interrupt() }
+                    }
                 }
             }
         }
