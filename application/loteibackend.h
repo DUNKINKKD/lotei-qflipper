@@ -235,3 +235,59 @@ private:
     bool m_open = false;
     bool m_busy = false;
 };
+
+class QSerialPort;
+
+// In-app Flipper CLI terminal. The Flipper's serial line speaks a text CLI by
+// default and switches to protobuf RPC on `start_rpc_session` -- the two share
+// one line, which is why you can't open the CLI (PuTTY etc.) while qFlipper holds
+// the port. This pauses the RPC session (ApplicationBackend::releasePort), opens
+// the same USB serial in text mode at 230400, and pipes it to an in-app terminal;
+// closing it restarts RPC. USB-only for now (BLE has a CLI mode too -- later).
+// Exposed to QML as the singleton `Cli`.
+class FlipperCli : public QObject
+{
+    Q_OBJECT
+    Q_PROPERTY(bool open READ isOpen WRITE setOpen NOTIFY openChanged)
+    Q_PROPERTY(bool active READ active NOTIFY activeChanged)   // serial link live
+    Q_PROPERTY(QString output READ output NOTIFY outputChanged)
+    Q_PROPERTY(QString status READ status NOTIFY statusChanged)
+
+public:
+    explicit FlipperCli(QObject *parent = nullptr);
+
+    void setAppBackend(ApplicationBackend *backend) { m_appBackend = backend; }
+
+    bool isOpen() const { return m_open; }
+    void setOpen(bool value);
+    bool active() const { return m_active; }
+    QString output() const { return m_output; }
+    QString status() const { return m_status; }
+
+    Q_INVOKABLE void send(const QString &cmd);   // write a command + CR
+    Q_INVOKABLE void interrupt();                // send Ctrl-C
+    Q_INVOKABLE void clearOutput();
+
+signals:
+    void openChanged();
+    void activeChanged();
+    void outputChanged();
+    void statusChanged();
+
+private slots:
+    void onReadyRead();
+
+private:
+    void connectCli();     // release RPC, open the serial in CLI/text mode
+    void disconnectCli();  // close the serial, hand RPC back
+    void appendOutput(const QString &text);
+    void setActive(bool v);
+    void setStatus(const QString &s);
+
+    ApplicationBackend *m_appBackend = nullptr;
+    QSerialPort *m_port = nullptr;
+    QString m_output;
+    QString m_status;
+    bool m_open = false;
+    bool m_active = false;
+};

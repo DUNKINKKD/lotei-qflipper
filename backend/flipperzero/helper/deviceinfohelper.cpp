@@ -61,11 +61,25 @@ VCPDeviceInfoHelper::VCPDeviceInfoHelper(const USBDeviceInfo &info, QObject *par
     m_deviceInfo.usbInfo = info;
 }
 
+void VCPDeviceInfoHelper::setBleTransport(const QString &name, const TransportFactory &factory)
+{
+    m_deviceInfo.isBle = true;
+    m_deviceInfo.name = name;                 // provisional; the RPC bootstrap overwrites it
+    m_deviceInfo.transportFactory = factory;
+}
+
 void VCPDeviceInfoHelper::nextStateLogic()
 {
     if(state() == AbstractDeviceInfoHelper::Ready) {
-        setState(VCPDeviceInfoHelper::FindingSerialPort);
-        findSerialPort();
+        if(m_deviceInfo.transportFactory) {
+            // BLE: no serial port to find -- go straight to opening the session
+            // over the injected transport.
+            setState(VCPDeviceInfoHelper::StartingRPCSession);
+            startRPCSession();
+        } else {
+            setState(VCPDeviceInfoHelper::FindingSerialPort);
+            findSerialPort();
+        }
 
     } else if(state() == VCPDeviceInfoHelper::FindingSerialPort) {
         setState(VCPDeviceInfoHelper::StartingRPCSession);
@@ -122,6 +136,9 @@ void VCPDeviceInfoHelper::findSerialPort()
 void VCPDeviceInfoHelper::startRPCSession()
 {
     m_rpc = new ProtobufSession(m_deviceInfo.portInfo, this);
+    if(m_deviceInfo.transportFactory) {
+        m_rpc->setTransport(m_deviceInfo.transportFactory(m_rpc));
+    }
     connect(m_rpc, &ProtobufSession::sessionStateChanged, this, &VCPDeviceInfoHelper::onSessionStatusChanged);
     m_rpc->startSession();
 }

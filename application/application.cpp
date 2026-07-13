@@ -125,6 +125,12 @@ void Application::initConnections()
     connect(&m_backend, &ApplicationBackend::currentDeviceChanged, this, &Application::onCurrentDeviceChanged);
 
     m_lotei.setAppBackend(&m_backend);
+    m_cli.setAppBackend(&m_backend);
+
+#ifdef HZUI_BLE
+    // Let the BLE panel register a wireless Flipper as the app's active device.
+    m_ble.setDeviceRegistry(m_backend.deviceRegistry());
+#endif
 
     // Shut LOTEI's brain (Ollama) down when qFlipper really quits, so it never
     // lingers, piles up duplicate servers, or hogs RAM. Only the primary
@@ -211,6 +217,10 @@ void Application::initQmlTypes()
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "Lotei", &m_lotei);
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "Palette", &m_palette);
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "Firmware", &m_firmware);
+    qmlRegisterSingletonInstance("QFlipper", 1, 0, "Cli", &m_cli);
+#ifdef HZUI_BLE
+    qmlRegisterSingletonInstance("QFlipper", 1, 0, "Ble", &m_ble);
+#endif
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "App", this);
     qmlRegisterSingletonInstance("QFlipper", 1, 0, "SystemFileDialog", &m_fileDialog);
 }

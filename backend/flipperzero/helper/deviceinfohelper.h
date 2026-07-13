@@ -48,6 +48,11 @@ class VCPDeviceInfoHelper : public AbstractDeviceInfoHelper
 public:
     VCPDeviceInfoHelper(const USBDeviceInfo &info, QObject *parent = nullptr);
 
+    // Configure this helper to bootstrap over BLE instead of a USB serial port:
+    // the RPC session is opened on a factory-built transport and serial-port
+    // finding is skipped. Call right after construction (before the event loop).
+    void setBleTransport(const QString &name, const TransportFactory &factory);
+
 private:
     void nextStateLogic() override;
 

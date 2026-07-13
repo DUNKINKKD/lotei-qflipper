@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include <QString>
 #include <QDateTime>
 #include <QSerialPortInfo>
@@ -12,6 +14,14 @@ class QSerialPort;
 
 namespace Flipper {
 namespace Zero {
+
+class FlipperTransport;
+
+// If set on a DeviceInfo, the RPC session runs over the transport this builds
+// (e.g. a BleTransport) instead of opening a USB serial port. The application
+// layer supplies it, so the backend never links QtBluetooth. Parented to the
+// caller-provided QObject; a fresh transport is built per session.
+using TransportFactory = std::function<Flipper::Zero::FlipperTransport*(QObject *parent)>;
 
 struct HardwareInfo {
     Q_GADGET
@@ -106,6 +116,12 @@ public:
 
     USBDeviceInfo usbInfo;
     QSerialPortInfo portInfo;
+
+    // Wireless (BLE) devices set these: the session/bootstrap run over the
+    // factory-built transport, and isBle marks the device for BLE-specific
+    // lifecycle (no USB unplug event, removed on link loss). Empty/false = USB.
+    TransportFactory transportFactory;
+    bool isBle = false;
 };
 
 }

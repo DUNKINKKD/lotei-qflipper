@@ -22,6 +22,7 @@ SOURCES += \
     flipperzero/assetmanifest.cpp \
     flipperzero/filemanager.cpp \
     flipperzero/protobufsession.cpp \
+    flipperzero/serialtransport.cpp \
     flipperzero/rpc/abstractprotobufoperation.cpp \
     flipperzero/rpc/abstractstorageoperation.cpp \
     flipperzero/rpc/guiscreenframeoperation.cpp \
@@ -133,6 +134,8 @@ HEADERS += \
     flipperzero/pixmaps/updateok.h \
     flipperzero/pixmaps/updating.h \
     flipperzero/protobufsession.h \
+    flipperzero/flippertransport.h \
+    flipperzero/serialtransport.h \
     flipperzero/rpc/abstractprotobufoperation.h \
     flipperzero/rpc/abstractstorageoperation.h \
     flipperzero/rpc/guiscreenframeoperation.h \

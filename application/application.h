@@ -10,6 +10,9 @@
 #include "systemfiledialog.h"
 #include "applicationupdateregistry.h"
 #include "loteibackend.h"
+#ifdef HZUI_BLE
+#include "blespike.h"
+#endif
 
 class Application : public QtSingleApplication
 {
@@ -76,6 +79,10 @@ private:
     LoteiBackend m_lotei;
     LoteiPalette m_palette;
     FirmwareStore m_firmware;
+    FlipperCli m_cli;
+#ifdef HZUI_BLE
+    BleSpike m_ble;
+#endif
     QQmlApplicationEngine m_engine;
 
     bool m_isDeveloperMode;

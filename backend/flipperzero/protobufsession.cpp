@@ -11,6 +11,7 @@
 #include "protobufplugininterface.h"
 #include "mainresponseinterface.h"
 
+#include "serialtransport.h"
 #include "helper/serialinithelper.h"
 
 #include "rpc/storageinfooperation.h"
@@ -53,7 +54,7 @@ ProtobufSession::ProtobufSession(const QSerialPortInfo &portInfo, QObject *paren
     QObject(parent),
     m_sessionState(Stopped),
     m_portInfo(portInfo),
-    m_serialPort(nullptr),
+    m_transport(nullptr),
 #if !defined(QT_STATIC)
     m_loader(new QPluginLoader(this)),
 #endif
@@ -83,6 +84,23 @@ bool ProtobufSession::isSessionUp() const
 void ProtobufSession::setSerialPort(const QSerialPortInfo &portInfo)
 {
     m_portInfo = portInfo;
+}
+
+void ProtobufSession::setTransport(FlipperTransport *transport)
+{
+    if(m_transport == transport) {
+        return;
+    }
+
+    if(m_transport) {
+        m_transport->deleteLater();
+    }
+
+    m_transport = transport;
+
+    if(m_transport) {
+        m_transport->setParent(this);
+    }
 }
 
 void ProtobufSession::setMajorVersion(int versionMajor)
@@ -242,6 +260,27 @@ void ProtobufSession::startSession()
         return;
     }
 
+    // An injected transport (e.g. BleTransport) opens asynchronously: kick it off
+    // and let opened()/openFailed() drive the session live, rather than opening a
+    // USB serial port from m_portInfo.
+    if(m_transport) {
+        // A fresh transport is built per session, so plain (non-unique) connects
+        // are correct here -- and Qt::UniqueConnection is illegal with a lambda
+        // slot anyway (it silently drops the connection).
+        connect(m_transport, &FlipperTransport::opened, this, &ProtobufSession::onTransportReady);
+        connect(m_transport, &FlipperTransport::openFailed, this, [=](const QString &err) {
+            qCCritical(LOG_SESSION).noquote() << "Failed to start RPC session:" << err;
+            stopEarly(BackendError::SerialError, err);
+        });
+
+        if(!m_transport->open()) {
+            qCCritical(LOG_SESSION).noquote() << "Failed to start RPC session:" << m_transport->errorString();
+            stopEarly(BackendError::SerialError, m_transport->errorString());
+        }
+
+        return;
+    }
+
     auto *helper = new SerialInitHelper(m_portInfo, this);
     connect(helper, &SerialInitHelper::finished, this, [=]() {
         helper->deleteLater();
@@ -252,21 +291,25 @@ void ProtobufSession::startSession()
             return;
         }
 
-        m_serialPort = helper->serialPort();
-
-        connect(m_serialPort, &QSerialPort::readyRead, this, &ProtobufSession::onSerialPortReadyRead);
-        connect(m_serialPort, &QSerialPort::bytesWritten, this, &ProtobufSession::onSerialPortBytesWriten);
-        connect(m_serialPort, &QSerialPort::errorOccurred, this, &ProtobufSession::onSerialPortErrorOccured);
-
-        qCInfo(LOG_SESSION) << "RPC session started successfully.";
-
-        if(!m_queue.isEmpty()) {
-            setSessionState(Running);
-            QTimer::singleShot(0, this, &ProtobufSession::processQueue);
-        } else {
-            setSessionState(Idle);
-        }
+        m_transport = new SerialTransport(helper->serialPort(), this);
+        onTransportReady();
     });
+}
+
+void ProtobufSession::onTransportReady()
+{
+    connect(m_transport, &FlipperTransport::readyRead, this, &ProtobufSession::onSerialPortReadyRead);
+    connect(m_transport, &FlipperTransport::bytesWritten, this, &ProtobufSession::onSerialPortBytesWriten);
+    connect(m_transport, &FlipperTransport::errorOccurred, this, &ProtobufSession::onSerialPortErrorOccured);
+
+    qCInfo(LOG_SESSION) << "RPC session started successfully.";
+
+    if(!m_queue.isEmpty()) {
+        setSessionState(Running);
+        QTimer::singleShot(0, this, &ProtobufSession::processQueue);
+    } else {
+        setSessionState(Idle);
+    }
 }
 
 void ProtobufSession::stopSession()
@@ -282,7 +325,7 @@ void ProtobufSession::stopSession()
 void ProtobufSession::onSerialPortReadyRead()
 {
     if(!isSessionUp()) {
-        m_serialPort->clear();
+        m_transport->clear();
         return;
 #if !defined(QT_STATIC)
     } else if(!m_loader->isLoaded()) {
@@ -292,7 +335,7 @@ void ProtobufSession::onSerialPortReadyRead()
 #endif
     }
 
-    m_receivedData.append(m_serialPort->readAll());
+    m_receivedData.append(m_transport->readAll());
     auto *response = m_plugin->decode(m_receivedData, this);
 
     if(!response) {
@@ -327,9 +370,9 @@ void ProtobufSession::onSerialPortErrorOccured()
 {
     qCInfo(LOG_SESSION) << "Serial connection was lost.";
 
-    disconnect(m_serialPort, &QSerialPort::readyRead, this, &ProtobufSession::onSerialPortReadyRead);
-    disconnect(m_serialPort, &QSerialPort::bytesWritten, this, &ProtobufSession::onSerialPortBytesWriten);
-    disconnect(m_serialPort, &QSerialPort::errorOccurred, this, &ProtobufSession::onSerialPortErrorOccured);
+    disconnect(m_transport, &FlipperTransport::readyRead, this, &ProtobufSession::onSerialPortReadyRead);
+    disconnect(m_transport, &FlipperTransport::bytesWritten, this, &ProtobufSession::onSerialPortBytesWriten);
+    disconnect(m_transport, &FlipperTransport::errorOccurred, this, &ProtobufSession::onSerialPortErrorOccured);
 
     stopSession();
 }
@@ -368,7 +411,7 @@ void ProtobufSession::writeToPort()
 
     do {
         const auto &buf = m_currentOperation->encodeRequest(m_plugin);
-        const auto bytesWritten = m_serialPort->write(buf);
+        const auto bytesWritten = m_transport->write(buf);
 
         success = bytesWritten >= 0;
 
@@ -382,10 +425,10 @@ void ProtobufSession::writeToPort()
 
     } while(m_currentOperation->hasMoreData());
 
-    success &= m_serialPort->flush();
+    success &= m_transport->flush();
 
     if(!success) {
-        setError(BackendError::SerialError, m_serialPort->errorString());
+        setError(BackendError::SerialError, m_transport->errorString());
         stopSession();
         return;
     }
@@ -399,9 +442,10 @@ void ProtobufSession::doStopSession()
         m_currentOperation->abort(QStringLiteral("RPC session was stopped with operations still running"));
     }
 
-    if(m_serialPort) {
-        m_serialPort->close();
-        m_serialPort->deleteLater();
+    if(m_transport) {
+        m_transport->close();
+        m_transport->deleteLater();
+        m_transport = nullptr;
     }
 
     unloadProtobufPlugin();

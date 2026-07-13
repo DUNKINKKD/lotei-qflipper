@@ -5,6 +5,7 @@
 
 #include "backenderror.h"
 #include "usbdeviceinfo.h"
+#include "flipperzero/deviceinfo.h"
 
 class USBDeviceDetector;
 
@@ -26,6 +27,8 @@ public:
     FlipperZero *currentDevice() const;
     int deviceCount() const;
 
+    bool hasBleDevice() const;   // any registered device connected over BLE?
+
     BackendError::ErrorType error() const;
     void clearError();
 
@@ -41,6 +44,12 @@ public slots:
     void insertDevice(const USBDeviceInfo &info);
     void removeDevice(const USBDeviceInfo &info);
     void removeOfflineDevices();
+
+    // Wireless (BLE) entry points, driven from the application layer. connect
+    // bootstraps device info over the factory-built transport then registers a
+    // FlipperZero exactly like USB; remove drops the BLE device on link loss.
+    void connectBleDevice(const QString &name, const Flipper::Zero::TransportFactory &factory);
+    void removeBleDevice();
 
 private slots:
     void processDevice();

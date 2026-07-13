@@ -233,10 +233,22 @@ void FlipperZero::onDeviceInfoChanged()
 
     m_rpc->setMajorVersion(pb.versionMajor);
     m_rpc->setMinorVersion(pb.versionMinor);
-    m_rpc->setSerialPort(pi);
 
-    // 100 ms delay to prevent race condition in Flipper
-    QTimer::singleShot(100, m_rpc, &ProtobufSession::startSession);
+    int startDelay = 100; // ms, to dodge a race in the Flipper on serial
+
+    if(deviceInfo.transportFactory) {
+        // Wireless: run the session over a freshly-built transport (e.g. BLE).
+        m_rpc->setTransport(deviceInfo.transportFactory(m_rpc));
+        // The bootstrap helper just disconnected its own BLE link. On Linux/BlueZ
+        // the ACL teardown is slow, and reconnecting to the same peer before it
+        // completes races a half-open link ("Not Connected" on the first
+        // descriptor write). Wait long enough for a clean disconnect first.
+        startDelay = 3000;
+    } else {
+        m_rpc->setSerialPort(pi);
+    }
+
+    QTimer::singleShot(startDelay, m_rpc, &ProtobufSession::startSession);
 }
 
 void FlipperZero::onSessionStatusChanged()
