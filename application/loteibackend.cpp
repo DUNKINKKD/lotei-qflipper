@@ -884,6 +884,48 @@ void LoteiBackend::finalizeStream()
     emit replyReceived(text);   // QML finalizes the live bubble
 }
 
+// Ollama puts the REAL reason for a failure in the body as {"error": "..."} --
+// even on a 500, where Qt only hands us "Internal Server Error", which tells the
+// user nothing. Dig the real message out and turn the common failures into
+// something actionable instead of a raw transfer error.
+static QString friendlyOllamaError(const QByteArray &body, const QString &model, const QString &fallback)
+{
+    QString raw;
+    // Body is either a bare error object or NDJSON with the error on some line.
+    const auto lines = body.split('\n');
+    for (const QByteArray &line : lines) {
+        const auto doc = QJsonDocument::fromJson(line.trimmed());
+        if (doc.isObject() && doc.object().contains(QStringLiteral("error"))) {
+            raw = doc.object().value(QStringLiteral("error")).toString();
+            break;
+        }
+    }
+    if (raw.isEmpty()) {
+        return fallback;  // nothing parseable -- keep Qt's own message
+    }
+
+    const QString low = raw.toLower();
+
+    // The common one on modest machines: the model doesn't fit in RAM/VRAM.
+    if (low.contains(QStringLiteral("system memory")) || low.contains(QStringLiteral("out of memory"))
+        || low.contains(QStringLiteral("insufficient memory")) || low.contains(QStringLiteral("cudamalloc"))) {
+        return QStringLiteral("%1 needs more memory than you have free. Try a smaller brain — run "
+                              "`ollama pull qwen2.5:3b`, then click my model name to switch. (Ollama said: %2)")
+                .arg(model, raw);
+    }
+    // Model was never pulled.
+    if (low.contains(QStringLiteral("not found"))) {
+        return QStringLiteral("the model %1 isn't downloaded yet. Run `ollama pull %1` in a terminal, "
+                              "then poke me again.").arg(model);
+    }
+    // Tools: we already retry tools-less once; if we still land here, say so plainly.
+    if (low.contains(QStringLiteral("tool"))) {
+        return QStringLiteral("%1 can't use my Flipper tools. Chat still works — for the device tools, "
+                              "pick a tool-capable model like qwen2.5. (Ollama said: %2)").arg(model, raw);
+    }
+    return QStringLiteral("Ollama said: %1").arg(raw);
+}
+
 void LoteiBackend::onStreamFinished(QNetworkReply *reply)
 {
     if (reply != m_currentReply) {  // already finalized (done seen) or superseded
@@ -908,9 +950,12 @@ void LoteiBackend::onStreamFinished(QNetworkReply *reply)
 
     setThinking(false);
     if (netErr != QNetworkReply::NoError) {
-        QString msg = netErrStr;
+        QString msg;
         if (netErr == QNetworkReply::ConnectionRefusedError || netErr == QNetworkReply::HostNotFoundError) {
             msg = QStringLiteral("my brain (Ollama) isn't awake. Launch me with the LOTEI shortcut.");
+        } else {
+            // Ollama's actual reason is in the body, not in Qt's status line.
+            msg = friendlyOllamaError(errBody, m_model, netErrStr);
         }
         emit errorOccurred(QStringLiteral("Hrm: %1").arg(msg));
     } else if (!m_streamContent.isEmpty()) {
