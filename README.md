@@ -58,6 +58,57 @@ Output: `build\qFlipper.exe`. For the first run, copy Qt's DLLs/plugins next to 
 
 After that, `build_pink_inc.bat` is the fast incremental build for code/QML changes.
 
+### 🐧 Building on Linux (from source)
+
+Prebuilt AppImages ship with each [release](../../releases) — this is only if you want to build it yourself.
+
+```bash
+# Debian / Ubuntu — everything the build needs
+sudo apt update && sudo apt install -y \
+    build-essential git \
+    qt6-base-dev qt6-base-dev-tools qt6-declarative-dev \
+    qt6-serialport-dev qt6-5compat-dev qt6-svg-dev qt6-connectivity-dev \
+    libgl1-mesa-dev libusb-1.0-0-dev
+
+# Clone WITH submodules (nanopb is required; a plain clone fails on pb_common.c)
+git clone <your-fork-url> --recursive lotei-qflipper
+cd lotei-qflipper
+
+mkdir build && cd build
+qmake6 ../qFlipper.pro CONFIG+=qtquickcompiler
+make -j"$(nproc)"
+```
+
+Output: `build/application/qFlipper`.
+
+- Already cloned without `--recursive`? Run `git submodule update --init --recursive` first.
+- `qt6-5compat-dev` (core5compat), `qt6-svg-dev` (svg) and `qt6-connectivity-dev` (Bluetooth/BLE) are easy to miss — qmake fails with `Unknown module(s) in QT: ...` if any are absent.
+- Developed against **Qt 6.4.2**, and builds on **6.7 / 6.8** (newer distros) too.
+- To build the **AppImage** instead, use `./build_linux.sh` (needs `linuxdeploy` + `linuxdeploy-plugin-qt` on `PATH`).
+- USB permissions: `sudo cp installer-assets/*.rules /etc/udev/rules.d/ && sudo udevadm control --reload` — or just run a release AppImage once with `./Hyper-Zero-UI-*.AppImage rules install`.
+
+<details>
+<summary>Optional: add a desktop launcher</summary>
+
+```bash
+sudo nano /usr/share/applications/lotei-qflipper.desktop
+```
+```ini
+[Desktop Entry]
+Type=Application
+Name=Hyper-Zero-UI
+Comment=AI-powered qFlipper fork for Flipper Zero
+Exec=/path/to/lotei-qflipper/build/application/qFlipper
+Icon=lotei-qflipper
+Terminal=false
+Categories=Development;Utility;
+```
+```bash
+sudo update-desktop-database
+```
+*(Thanks to @MrSwan84 for working this out on Ubuntu 25.10.)*
+</details>
+
 ## 🐬 Set up LOTEI (the AI + voice)
 
 1. **Ollama** — install it, then: `ollama pull qwen2.5:7b`

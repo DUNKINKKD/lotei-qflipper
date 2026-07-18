@@ -39,7 +39,11 @@ public:
     Color color;
     Region region;
 
-    // Needed in order to work with QVariant
+    // Needed in order to work with QVariant. Qt 6.7+ additionally requires an
+    // operator== for MEMBER properties (its generated moc code compares before
+    // notifying), so define both -- "always different" preserves the original
+    // behaviour of always emitting the change.
+    bool operator ==(const HardwareInfo &other) const { Q_UNUSED(other) return false; }
     bool operator !=(const HardwareInfo &other) const { Q_UNUSED(other) return true; }
 };
 
@@ -58,7 +62,8 @@ public:
     QString channel;
     QDate date;
 
-    // Needed in order to work with QVariant
+    // Needed in order to work with QVariant (+ operator== for Qt 6.7's moc).
+    bool operator ==(const SoftwareInfo &other) const { Q_UNUSED(other) return false; }
     bool operator !=(const SoftwareInfo &other) const { Q_UNUSED(other) return true; }
 };
 
@@ -75,7 +80,8 @@ public:
     bool isExternalPresent;
     bool isAssetsInstalled;
 
-    // Needed in order to work with QVariant
+    // Needed in order to work with QVariant (+ operator== for Qt 6.7's moc).
+    bool operator ==(const StorageInfo &other) const { Q_UNUSED(other) return false; }
     bool operator !=(const StorageInfo &other) const { Q_UNUSED(other) return true; }
 };
 
